@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>MCSR Ranked Pace Target</title>
 <style>
 :root{--bg:#fafafa;--s:#fff;--s2:#f4f4f5;--b:#e4e4e7;--t:#18181b;--m:#52525b;--a:#00843a;--w:#c2410c;--r:#eee;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
@@ -16,22 +16,24 @@ th{color:var(--m);font-size:12px;font-weight:500}th:first-child,td:first-child{t
 td.s{color:var(--a);font-weight:600}td.r{color:var(--w)}.lo{opacity:.65}.note{color:var(--m);font-size:12px;margin-top:10px}.err{color:var(--w)}
 </style></head><body><div class="c">
 <h1>MCSR Ranked Pace Target</h1>
-<div class="card" id="ld" hidden><div class="note" style="margin:0 0 10px">実データ(data/finishers.json)が見つかりません。collect.py で作ったJSONを読み込むか、デモデータでUIを確認できます。</div>
-<div class="row"><input type="file" id="fi" accept=".json,application/json"><button id="dmb" type="button">デモデータで表示</button></div></div>
-<div id="dm" class="note err" hidden>デモ用の乱数データです。実際のMCSR Rankedの記録ではありません。</div>
+<div class="card" id="ld" hidden><div class="note" style="margin:0 0 10px">No data found (data/finishers.json). Load a JSON built by collect.py, or preview the UI with demo data.</div>
+<div class="row"><input type="file" id="fi" accept=".json,application/json"><button id="dmb" type="button">Show demo data</button></div></div>
+<div id="dm" class="note err" hidden>Demo data (random numbers), not real MCSR Ranked records.</div>
 <div class="card"><div class="row">
- <div><label>目標タイム (m:ss)</label><input type="text" id="tt"></div>
- <div><label>最初の構造物</label><select id="rt"><option value="bastion">バスチオン先</option><option value="fortress">フォートレス先</option><option value="all">すべて</option></select></div>
- <div><label>スタート形態</label><select id="ow"><option value="all">すべて</option><option value="0">埋もれた宝</option><option value="1">沈没船</option><option value="2">鍛冶屋村</option><option value="3">荒廃したポータル</option><option value="4">ピラミッド</option></select></div>
- <div><label>リセット基準</label><select id="ps"><option value="aggressive">攻め</option><option value="balanced" selected>標準</option><option value="persistent">粘り</option></select></div>
+ <div><label>Target time (m:ss)</label><input type="text" id="tt"></div>
+ <div><label>First structure</label><select id="rt"><option value="bastion">bastion-first</option><option value="fortress">fortress-first</option><option value="all">all</option></select></div>
+ <div><label>Season</label><select id="se"><option value="all">all</option></select></div>
+ <div><label>Start type</label><select id="ow"><option value="all">all</option><option value="0">Buried Treasure</option><option value="1">Shipwreck</option><option value="2">Village</option><option value="3">Ruined Portal</option><option value="4">Desert Temple</option></select></div>
+ <div><label>Bastion type</label><select id="bt"><option value="all">all</option><option value="0">Bridge Bastion</option><option value="1">Housing Bastion</option><option value="2">Stables Bastion</option><option value="3">Treasure Bastion</option></select></div>
+ <div><label>Reset policy</label><select id="ps"><option value="aggressive">Aggressive</option><option value="balanced" selected>Balanced</option><option value="persistent">Persistent</option></select></div>
 </div><input type="range" id="sl" min="360000" max="1800000" step="10000" style="margin-top:12px"><div class="note" id="info"></div></div>
-<div class="card" style="padding:0"><table><thead><tr><th>区間</th><th>余裕(80%)</th><th>標準(50%)</th><th>ギリギリ(20%)</th><th id="rh">リセット</th></tr></thead><tbody id="tb"></tbody></table></div>
-<div class="note">区間はMCSR Rankedの試合タイムライン(試合開始からの累計時刻)の各イベントで切っています。各値=「その区間をこの時間以内に抜ければ、目標達成確率がそのレベル以上」。リセットはそれより遅いと目標達成がほぼ不可能な目安。完走者のみのデータなので、遅い試合が抜けて基準はやや厳しめに出ます。</div>
+<div class="card" style="padding:0"><table><thead><tr><th>Split</th><th>Safe (80%)</th><th>Standard (50%)</th><th>Tight (20%)</th><th id="rh">Reset</th></tr></thead><tbody id="tb"></tbody></table></div>
+<div class="note">Splits follow MCSR Ranked match timeline events (cumulative time from match start). Each value: finishing the split within that time keeps the chance of hitting the target at or above that level. Reset: slower than this, the target is very unlikely. Only finished runs are counted, so thresholds run slightly strict.<br>— = no data or not applicable (e.g. no time reaches that probability). (m:ss) = fewer than 5 samples.<br>各値=その区間をこの時間以内に抜ければ、目標達成確率がそのレベル以上。— は該当なし、括弧つきはサンプル5件未満。</div>
 <div id="err" class="err"></div></div>
 <script>
 const K=['nether','bastion','fortress','rod','blind','stronghold','end','dragon'],M=6e4,B=1e4,R5=5,HI=18e5;
 const NM={nether:'nether enter',bastion:'bastion',fortress:'fortress',rod:'first rod',blind:'blind',stronghold:'stronghold',end:'end enter',dragon:'dragon death',finish:'finish'};
-const ID={nether:'story.enter_the_nether',bastion:'nether.find_bastion',fortress:'nether.find_fortress',rod:'nether.obtain_blaze_rod',blind:'projectelo.timeline.blind_travel',stronghold:'story.follow_ender_eye',end:'story.enter_the_end',dragon:'projectelo.timeline.dragon_death',finish:'完走タイム'};
+const ID={nether:'story.enter_the_nether',bastion:'nether.find_bastion',fortress:'nether.find_fortress',rod:'nether.obtain_blaze_rod',blind:'projectelo.timeline.blind_travel',stronghold:'story.follow_ender_eye',end:'story.enter_the_end',dragon:'projectelo.timeline.dragon_death',finish:'completion time'};
 const CAP={nether:10*M,bastion:12*M,fortress:15*M,rod:16*M,blind:18*M,stronghold:20*M,end:22*M,dragon:24*M},MG={nether:5*M,bastion:4*M,fortress:3*M,rod:2.5*M,blind:2*M,stronghold:M,end:M,dragon:M/2};
 const PS={aggressive:[.4,.3,.2,.16,.12,.06,.03,.02],balanced:[.25,.18,.12,.09,.06,.03,.02,.02],persistent:[.08,.05,.03,.025,.02,.02,.02,.02]};
 const fmt=ms=>ms==null?'—':Math.floor(ms/M)+':'+String(Math.floor(ms/1e3)%60).padStart(2,'0');
@@ -48,28 +50,28 @@ function thr(bs,rp){if(!bs.length)return{};let a=-1,o=-1;bs.forEach((b,i)=>{if(b
 const cell=(x,cls)=>`<td class="${cls||''} ${x&&x.lo?'lo':''}">${x?(x.lo?'(':'')+fmt(x.ms)+(x.lo?')':''):'—'}</td>`;
 const sub=k=>`<td class="k">${NM[k]}<div class="sub">${ID[k]}</div></td>`;
 function route(i,r){if(r==='all')return true;const b=C.bastion[i],f=C.fortress[i];if(b==null||f==null)return false;return r==='bastion'?b<f:f<b}
-function draw(){const tg=+$('sl').value,r=$('rt').value,st=$('ow').value,pr=PS[$('ps').value],idx=[];
- for(let i=0;i<N;i++)if(route(i,r)&&(st==='all'||C.start[i]==st))idx.push(i);
- const hit=idx.filter(i=>C.finish[i]<=tg).length;$('info').textContent=`対象 ${idx.length} 完走(うち目標以内 ${hit}) / 最速 ${fmt(FAST)}`;
- $('rh').textContent='リセット(P<'+Math.round(pr[0]*100)+'%〜)';
+function draw(){const tg=+$('sl').value,r=$('rt').value,st=$('ow').value,bt=$('bt').value,se=$('se').value,pr=PS[$('ps').value],idx=[];
+ for(let i=0;i<N;i++)if(route(i,r)&&(st==='all'||C.start[i]==st)&&(bt==='all'||C.bastion_type[i]==bt)&&(se==='all'||C.season[i]==se))idx.push(i);
+ const hit=idx.filter(i=>C.finish[i]<=tg).length;$('info').textContent=`${idx.length} finishes (${hit} within target) · fastest ${fmt(FAST)}`;
+ $('rh').textContent='Reset (P<'+Math.round(pr[0]*100)+'% → '+Math.round(pr[7]*100)+'%)';
  $('tb').innerHTML=K.map((k,j)=>{const cap=Math.max(CAP[k],tg-MG[k]),bs=bins(idx,k,tg,cap),t=thr(bs,pr[j]);if(!t.r&&bs.length)t.r={ms:cap,lo:true};
   return`<tr>${sub(k)}${cell(t.c)}${cell(t.s,'s')}${cell(t.t)}${cell(t.r,'r')}</tr>`}).join('')+`<tr>${sub('finish')}<td>—</td>${cell({ms:tg},'s')}<td>—</td><td>—</td></tr>`}
 function setT(ms){$('sl').value=ms;$('tt').value=fmt(ms);$('tt').className='';draw()}
 $('sl').oninput=e=>setT(+e.target.value);
 $('tt').onchange=e=>{const v=parse(e.target.value);if(v==null||v<LO||v>HI){e.target.className='bad';return}setT(v)};
-$('rt').onchange=$('ow').onchange=$('ps').onchange=draw;
-function init(f,demo,meta){C=f.runs;N=C.finish.length;if(!C.start)C.start=new Array(N).fill(-1);
+$('rt').onchange=$('ow').onchange=$('bt').onchange=$('se').onchange=$('ps').onchange=draw;
+function init(f,demo,meta){C=f.runs;N=C.finish.length;if(!C.start)C.start=new Array(N).fill(-1);if(!C.bastion_type)C.bastion_type=new Array(N).fill(-1);if(!C.season)C.season=new Array(N).fill(0);$('se').innerHTML='<option value="all">all</option>'+[...new Set(C.season)].filter(x=>x>0).sort((a,b)=>b-a).map(x=>`<option value="${x}">Season ${x}</option>`).join('');
  let mn=Infinity;for(const v of C.finish)if(v<mn)mn=v;if(meta&&meta.record_ms)mn=Math.min(mn,meta.record_ms);
  FAST=mn;LO=Math.floor(mn/B)*B;$('sl').min=LO;$('sl').max=Math.max(HI,LO+B);
  const s=[...C.finish].sort((a,b)=>a-b),p25=s[Math.floor(s.length/4)];
  $('ld').hidden=true;$('dm').hidden=!demo;setT(Math.min(HI,Math.max(LO,Math.round(p25/B)*B)))}
-function demoData(){let sd=7;const r=()=>(sd=sd*16807%2147483647)/2147483647,g=()=>r()+r()+r()-1.5,keys=[...K,'finish','start'],R={};keys.forEach(k=>R[k]=[]);
+function demoData(){let sd=7;const r=()=>(sd=sd*16807%2147483647)/2147483647,g=()=>r()+r()+r()-1.5,keys=[...K,'finish','start','bastion_type','season'],R={};keys.forEach(k=>R[k]=[]);
  for(let i=0;i<5000;i++){const q=g(),o=Math.floor(r()*5),L=(a,b)=>Math.max(2e4,(a+b*q+g()*b*.6)*1e3);
   let n=L(120+o*8,30),x=n+L(80,15),y=x+L(110,18);if(r()<.4)[x,y]=[y,x];
   const ro=Math.max(x,y)+L(100,15),bl=ro+L(60,10),st=bl+L(130,20),en=st+L(150,25),dr=en+L(90,15),fi=dr+L(12,3);
-  [n,x,y,ro,bl,st,en,dr,fi].forEach((v,k)=>R[keys[k]].push(Math.round(v)));R.start.push(o)}
+  [n,x,y,ro,bl,st,en,dr,fi].forEach((v,k)=>R[keys[k]].push(Math.round(v)));R.start.push(o);R.bastion_type.push(Math.floor(r()*4));R.season.push(9+Math.floor(r()*4))}
  return{runs:R}}
-$('fi').onchange=e=>e.target.files[0].text().then(t=>init(JSON.parse(t),false,null)).catch(x=>$('err').textContent='読み込み失敗: '+x.message);
+$('fi').onchange=e=>e.target.files[0].text().then(t=>init(JSON.parse(t),false,null)).catch(x=>$('err').textContent='Load failed: '+x.message);
 $('dmb').onclick=()=>init(demoData(),true,null);
 Promise.all([fetch('data/finishers.json'),fetch('data/meta.json').catch(()=>null)]).then(async([a,b])=>{if(!a.ok)throw 0;const f=await a.json();let m=null;try{m=b&&b.ok?await b.json():null}catch(e){}init(f,false,m)}).catch(()=>{$('ld').hidden=false});
 </script></body></html>
