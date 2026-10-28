@@ -1,0 +1,28 @@
+name: update-data
+on:
+  schedule: [{cron: "0 */6 * * *"}]
+  workflow_dispatch:
+concurrency: {group: update, cancel-in-progress: false}
+permissions: {contents: write, pages: write, id-token: write}
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.dep.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: {python-version: "3.12"}
+      - run: python collect.py fetch --minutes 40 --months 3 && python collect.py build --months 3
+      - run: |
+          git config user.name github-actions
+          git config user.email actions@users.noreply.github.com
+          git add data/matches.jsonl
+          git commit -m "update cache" || true
+          git push
+      - run: mkdir _site && cp index.html _site/ && cp -r data _site/data && rm _site/data/matches.jsonl
+      - uses: actions/upload-pages-artifact@v3
+        with: {path: _site}
+      - id: dep
+        uses: actions/deploy-pages@v4
