@@ -1,6 +1,6 @@
 name: update-data
 on:
-  schedule: [{cron: "0 */6 * * *"}]
+  schedule: [{cron: "0 */3 * * *"}]
   workflow_dispatch:
 concurrency: {group: update, cancel-in-progress: false}
 permissions: {contents: write, pages: write, id-token: write}
@@ -27,7 +27,7 @@ jobs:
           git init -q -b data
           git config user.name github-actions
           git config user.email actions@users.noreply.github.com
-          git add recent.jsonl state.json archive
+          git add recent.jsonl state.json runners.json archive
           git commit -q -m "data $(date -u +%F)"
           git push -q -f "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" data
       - run: mkdir -p _site/data && cp index.html _site/ && cp data/finishers.json data/meta.json _site/data/
