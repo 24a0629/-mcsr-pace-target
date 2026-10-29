@@ -1,8 +1,15 @@
-# MCSR Ranked Pace Target
-1. GitHubで新しい公開リポジトリを作り、このフォルダの中身(index.html / collect.py / .gitignore / README.md / .github/workflows/update.yml)を置く。
-   (.github は「Add file → Create new file」でパスに `.github/workflows/update.yml` と入力して貼り付けると確実)
-2. Settings → Pages → Source を「GitHub Actions」にする。
-3. Actions タブ → update-data → Run workflow で初回実行(以後は6時間ごとに自動)。
-4. 公開URL: https://<ユーザー名>.github.io/<リポジトリ名>/
-蓄積データは `data` ブランチ(recent.jsonl / archive/s<シーズン>.jsonl / state.json)に保存される(毎回1コミットに上書きするので履歴は増えない)。
-ローカル確認: python collect.py fetch --minutes 5 → python collect.py build → python -m http.server
+# MCSR Ranked Pace Target(自分用・手元で動かす版)
+公開はしない前提。GitHub Pages / GitHub Actions は使いません。
+
+## 使い方(管理者権限不要・Python 3 のみ)
+1. この中身を好きなフォルダに展開する。
+2. `collect.bat` をダブルクリック → 約25分でデータ収集 → `data/finishers.json` を生成。何度でも実行でき、続きから再開する。
+3. `view.bat` をダブルクリック → ブラウザで http://127.0.0.1:8000/ が開く(自分のPCからしか見えない)。
+
+## メモ
+- データは `data/` に蓄積される(recent.jsonl / archive/ / runners.json / state.json)。消えると集め直しになるので、ときどきフォルダごとコピーしてバックアップ。
+- 収集が遅いのはAPIの上限(10分で500リクエスト)のため。実行回数を増やすほど古いシーズンまで遡れる。
+- 自動実行したいときは、Windowsのタスクスケジューラ(ユーザー権限)で `collect.bat` を定期実行する。
+- Claude上の公開ページ(自分だけが見られるプレビュー)に `data/finishers.json` を読み込ませて使うこともできる。リンクは共有しないこと。
+
+サイト下部の「Thanks & credits」は同じページ内の `#thanks` 表示。XのURLなどは index.html 内の `XL` で変更できる。

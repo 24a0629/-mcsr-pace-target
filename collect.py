@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """MCSR Ranked のランク戦から完走データを集めて蓄積する(標準ライブラリのみ・管理者権限不要)。
   python collect.py fetch [--minutes 25]   # 何度でも再実行OK(続きから再開)
-  python collect.py build [--days 14]      # 古い試合を数値だけの archive に移し、finishers.json / meta.json を生成
+  python collect.py build [--days 14]      # 古い試合を数値だけ(走者は番号)の archive に移し、finishers.json / meta.json を生成
 収集の優先順: ①最新の試合(既知の範囲まで) → ②古い試合を新しい順に遡る(シーズンをまたいで続きから再開)"""
 import json, time, datetime, argparse, urllib.request, urllib.error
 from pathlib import Path
@@ -17,7 +17,8 @@ EV = {"nether": "story.enter_the_nether", "bastion": "nether.find_bastion",
 KEYS = list(EV)  # finish は completions の時間
 OW = ["BURIED_TREASURE", "SHIPWRECK", "VILLAGE", "RUINED_PORTAL", "DESERT_TEMPLE"]  # index.html と対応
 BT = ["BRIDGE", "HOUSING", "STABLES", "TREASURE"]                                  # index.html と対応
-COLS = ["season", "time", "start", "bastion_type", "finish", *KEYS]  # archive に残す数値列
+COLS = ["runner_idx", "season", "time", "start", "bastion_type", "finish", *KEYS]  # archive に残す数値列(走者は番号だけ)
+RUNNERS = D / "runners.json"  # 走者番号 → [ニックネーム, UUID, 最終試合日]
 
 def get(path):
     for k in range(5):
@@ -124,9 +125,20 @@ def record():
     try: return min(e["time"] for e in get("/record-leaderboard"))
     except Exception as e: print("最速タイムの取得に失敗:", e); return None
 
+def rid(runners, uuid, nick, date):
+    r = runners.get(uuid)
+    if r is None: r = runners[uuid] = [len(runners), nick, date]
+    elif date > r[2]: r[1], r[2] = nick, date  # ニックネームは最新の試合のものに更新
+    return r[0]
+
 def build(days):
     cutoff = time.time() - days * 86400
-    keep, arch = [], {}
+    runners = {}
+    if RUNNERS.exists():
+        for i, (nk, u, d) in enumerate(json.loads(RUNNERS.read_text(encoding="utf-8"))): runners[u] = [i, nk, d]
+    def vals(m, nick, uuid, fin, sp):
+        return [rid(runners, uuid, nick, m["date"]), m["season"], m["date"], m["ow"], m.get("bt", -1), fin, *sp]
+    keep, arch, R = [], {}, {c: [] for c in COLS}
     if RECENT.exists():
         for l in RECENT.open(encoding="utf-8"):
             m = json.loads(l)
@@ -134,34 +146,29 @@ def build(days):
                 keep.append(l if l.endswith("\n") else l + "\n"); continue
             g = arch.setdefault(m["season"], {"ids": [], "runs": {c: [] for c in COLS}})
             g["ids"].append(m["id"])
-            for _n, _u, fin, *sp in m["rows"]:
-                for c, v in zip(COLS, [m["season"], m["date"], m["ow"], m.get("bt", -1), fin, *sp]):
-                    g["runs"][c].append(v)
-        for s, g in arch.items():  # 追記のみ(数値だけ・ID は差分符号化)
+            for nick, uuid, fin, *sp in m["rows"]:
+                for c, v in zip(COLS, vals(m, nick, uuid, fin, sp)): g["runs"][c].append(v)
+        for sn, g in arch.items():  # 追記のみ(数値だけ・ID は差分符号化)
             ids = sorted(g["ids"]); delta = [ids[0]] + [b - a for a, b in zip(ids, ids[1:])]
-            with (A / f"s{s}.jsonl").open("a", encoding="utf-8") as f:
+            with (A / f"s{sn}.jsonl").open("a", encoding="utf-8") as f:
                 f.write(json.dumps({"ids": delta, "runs": g["runs"]}) + "\n")
         RECENT.write_text("".join(keep), encoding="utf-8")
-    R = {c: [] for c in ["runner_idx", *COLS]}
     for p in sorted(A.glob("s*.jsonl")):
         for l in p.open(encoding="utf-8"):
-            runs = json.loads(l)["runs"]
-            for c in COLS: R[c].extend(runs[c])
-            R["runner_idx"].extend([-1] * len(runs["finish"]))
-    runners = {}
+            runs = json.loads(l)["runs"]; k = len(runs["finish"])
+            for c in COLS: R[c].extend(runs.get(c, [-1] * k))  # 旧形式の archive は走者番号なし(-1)
     for l in keep:
         m = json.loads(l)
         for nick, uuid, fin, *sp in m["rows"]:
-            R["runner_idx"].append(runners.setdefault(uuid, (len(runners), nick))[0])
-            for c, v in zip(COLS, [m["season"], m["date"], m["ow"], m.get("bt", -1), fin, *sp]): R[c].append(v)
-    names = [None] * len(runners)
-    for u, (i, nk) in runners.items(): names[i] = [nk, u]
-    (D / "finishers.json").write_text(json.dumps({"schema_version": 4, "runners": names, "runs": R}))
-    (D / "meta.json").write_text(json.dumps({"schema_version": 4, "runs": len(R["finish"]),
+            for c, v in zip(COLS, vals(m, nick, uuid, fin, sp)): R[c].append(v)
+    ordered = sorted(runners.items(), key=lambda kv: kv[1][0])
+    RUNNERS.write_text(json.dumps([[r[1], u, r[2]] for u, r in ordered], ensure_ascii=False), encoding="utf-8")
+    (D / "finishers.json").write_text(json.dumps({"schema_version": 5, "runners": [[r[1], u] for u, r in ordered], "runs": R}, ensure_ascii=False))
+    (D / "meta.json").write_text(json.dumps({"schema_version": 5, "runs": len(R["finish"]),
         "record_ms": record(), "snapshot_date": datetime.date.today().isoformat()}))
     bys = {}
-    for s in R["season"]: bys[s] = bys.get(s, 0) + 1
-    print(f"{len(R['finish'])} 完走を書き出し / シーズン別:", dict(sorted(bys.items())),
+    for sn in R["season"]: bys[sn] = bys.get(sn, 0) + 1
+    print(f"{len(R['finish'])} 完走 / 走者 {len(runners)} 人 / シーズン別:", dict(sorted(bys.items())),
           "/ 区間ごとの取得数:", {k: sum(v is not None for v in R[k]) for k in KEYS},
           "/ スタート形態:", {o: R["start"].count(i) for i, o in enumerate(OW)},
           "/ バスチオン:", {o: R["bastion_type"].count(i) for i, o in enumerate(BT)})
