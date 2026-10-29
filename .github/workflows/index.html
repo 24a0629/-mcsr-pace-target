@@ -1,0 +1,186 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>MCSR Ranked Pace Target</title>
+<style>
+:root{--bg:#0a0a0a;--surface:#121212;--surface-2:#181818;--surface-3:#232323;--border:#262626;--border-soft:#1c1c1c;--text:#fafafa;--muted:#a3a3a3;--muted-dim:#6b6b6b;--accent:#00a544;--accent-bright:#05df72;--accent-soft:#05df7220;--accent-glow:#05df722e;--warn:#fb923c;--warn-soft:#fb923c1a;color-scheme:dark;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+html[lang=ja] [lang=en],html[lang=en] [lang=ja]{display:none!important}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);-webkit-font-smoothing:antialiased;letter-spacing:-.005em;font:14px/1.55 -apple-system,BlinkMacSystemFont,Inter,"Hiragino Sans","Yu Gothic UI",sans-serif}
+.container{max-width:1024px;margin:0 auto;padding:32px 24px 80px}
+.app-header{display:flex;justify-content:space-between;align-items:center;gap:16px;margin-bottom:28px}
+.app-header h1{display:flex;align-items:center;gap:10px;margin:0;font-size:18px;font-weight:600;letter-spacing:-.01em}
+.dot{width:7px;height:7px;border-radius:50%;background:var(--accent-bright);box-shadow:0 0 8px var(--accent-glow)}
+.lang-toggle{display:inline-flex;background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:2px}
+.lang-toggle button{border:0;background:none;color:var(--muted);border-radius:4px;padding:4px 10px;font:500 12px inherit;font-family:inherit;cursor:pointer}.lang-toggle button.active{background:var(--surface-3);color:var(--text)}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:10px;margin-bottom:12px;overflow:hidden}
+.card>h2{display:flex;justify-content:space-between;align-items:center;gap:12px;margin:0;padding:16px 20px;font-size:14px;font-weight:600;border-bottom:1px solid var(--border-soft)}
+.body{padding:18px 20px}
+.help-toggle{width:22px;height:22px;padding:0;border:1px solid var(--border);border-radius:5px;background:none;color:var(--muted-dim);font:12px/1 inherit;font-family:inherit;cursor:pointer;transition:color .12s,border-color .12s}
+.help-toggle:hover{color:var(--text);border-color:var(--muted-dim)}.help-toggle[aria-expanded=true]{color:var(--accent-bright);border-color:var(--accent-soft);background:var(--accent-soft)}
+.help-content{background:var(--bg);border-top:1px solid var(--border-soft);padding:16px 20px;color:var(--muted);font-size:12.5px;line-height:1.6}.help-content[hidden]{display:none}.help-content strong{color:var(--text);font-weight:500}.help-content p{margin:0 0 6px}.help-content p:last-child{margin:0}
+.controls{display:grid;grid-template-columns:1fr 1fr;gap:24px}.controls.filters{grid-template-columns:repeat(3,1fr);gap:16px;margin-top:20px}.controls.search{grid-template-columns:minmax(0,360px) minmax(0,200px)}
+.field{display:flex;flex-direction:column;gap:6px}.field label{color:var(--muted);font-size:12px;font-weight:500}.row{display:flex;align-items:center;gap:8px}
+input[type=text],select{background:var(--surface-2);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:7px 11px;font:16px inherit;font-family:inherit;transition:border-color .12s}
+input[type=text]:focus,select:focus{border-color:var(--accent-bright);box-shadow:0 0 0 3px var(--accent-glow);outline:0}
+input[type=text]{width:84px;text-align:center;font-variant-numeric:tabular-nums}input[type=text].bad{border-color:var(--warn)}#mc{width:220px;text-align:left}
+select{max-width:100%}.field>select{width:100%}
+input[type=range]{flex:1;appearance:none;height:3px;border-radius:2px;background:var(--surface-3);outline:0}
+input[type=range]::-webkit-slider-thumb{appearance:none;width:14px;height:14px;border-radius:50%;background:var(--accent-bright);cursor:pointer}input[type=range]::-moz-range-thumb{width:14px;height:14px;border:0;border-radius:50%;background:var(--accent-bright);cursor:pointer}
+.slider-row{display:flex;align-items:center;gap:12px;margin-top:8px}.endpoint{color:var(--muted-dim);font-size:11px}
+.dsc{margin-top:8px;font-size:12px;line-height:1.55;color:var(--muted)}
+.stat-line{margin-top:16px;padding-top:14px;border-top:1px solid var(--border-soft);color:var(--muted);font-size:12.5px}.stat-line strong{color:var(--text);font-weight:500;font-variant-numeric:tabular-nums}.dim{color:var(--muted-dim)}
+table.splits{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums}
+table.splits th{text-align:right;color:var(--muted);border-bottom:1px solid var(--border-soft);padding:10px 16px;font-size:12px;font-weight:500}
+table.splits td{text-align:right;border-bottom:1px solid var(--border-soft);padding:11px 16px;font-size:13.5px}table.splits tr:last-child td{border-bottom:0}
+table.splits th:first-child,table.splits td.split-name{text-align:left}td.split-name{font:500 13px ui-monospace,SFMono-Regular,Menlo,monospace}
+.sub{color:var(--muted-dim);font:400 10px/1.3 inherit;font-family:inherit;margin-top:2px;letter-spacing:0}td.split-name .sub{font-family:ui-monospace,monospace}
+.t-safe{color:var(--accent-bright);font-weight:500}.t-risky{color:var(--muted)}.reset{color:var(--warn)}
+.low-sample{position:relative;opacity:.7}.low-sample:before{content:"(";position:absolute;right:100%;margin-right:1px}.low-sample:after{content:")";position:absolute;left:100%;margin-left:1px}
+.pace-chart-wrap{max-width:700px;margin:0 auto}.pace-chart{overflow:visible}.pace-chart text{font-size:12px}
+.pace-chart-legend{display:flex;flex-wrap:wrap;justify-content:center;gap:6px 18px;margin-top:10px;color:var(--muted);font-size:13px}.pace-chart-legend-item{display:inline-flex;align-items:center;gap:6px;white-space:nowrap}.pace-chart-legend-swatch{display:inline-block;width:18px;height:0}
+.user-stats{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-top:12px}.user-stat{background:var(--surface-2);border:1px solid var(--border-soft);border-radius:8px;padding:12px 14px}
+.user-stat .label{color:var(--muted-dim);font-size:11px}.user-stat .value{margin-top:4px;font-size:20px;font-weight:600;letter-spacing:-.01em;font-variant-numeric:tabular-nums}.user-stat .delta{margin-top:4px;color:var(--muted);font-size:11px}.delta.faster{color:var(--accent-bright)}.delta.slower{color:var(--warn)}
+.pctl-bar{height:3px;margin-top:8px;border-radius:2px;background:var(--surface-3);overflow:hidden}.pctl-bar>div{height:100%;background:var(--accent-bright)}
+button.primary{background:var(--accent);color:#021a08;border:0;border-radius:6px;padding:8px 14px;font:600 13px inherit;font-family:inherit;cursor:pointer;transition:background .12s}button.primary:hover{background:var(--accent-bright)}
+button.secondary{background:var(--surface-2);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:7px 13px;font:500 13px inherit;font-family:inherit;cursor:pointer}
+.notice{background:var(--bg);border-left:2px solid var(--warn);color:var(--muted);border-radius:0 4px 4px 0;margin-bottom:16px;padding:10px 14px;font-size:12px}
+.note{color:var(--muted);font-size:12px;margin-top:10px}.err{color:var(--warn)}
+a{color:var(--accent-bright);text-decoration:none}a:hover{text-decoration:underline}
+.lead{margin:0 0 4px;color:var(--muted)}.person{background:var(--surface-2);border:1px solid var(--border-soft);border-radius:8px;padding:16px 18px;margin-top:14px}.person h3{margin:0 0 6px;font-size:15px;font-weight:600}.person p{margin:0 0 10px;color:var(--muted);font-size:13px;line-height:1.7}.links{margin:0;padding-left:18px;font-size:13px;color:var(--muted-dim)}.links li{margin:2px 0}.fine{margin-top:18px;padding-top:14px;border-top:1px solid var(--border-soft);color:var(--muted-dim);font-size:12px}.back{display:inline-block;margin-bottom:12px;font-size:13px}
+footer{text-align:center;color:var(--muted-dim);margin-top:32px;font-size:12px}
+@media(max-width:640px){.container{padding:20px 0 60px}.app-header,footer{padding-left:16px;padding-right:16px}.app-header{margin-bottom:16px}.card{border-left:0;border-right:0;border-radius:0;margin-bottom:0}.card+.card{margin-top:12px}.card>h2{padding:14px 16px}.body{padding:16px}.help-content{padding:14px 16px}.controls,.controls.filters,.controls.search{grid-template-columns:1fr;gap:16px}.user-stats{grid-template-columns:1fr 1fr;gap:8px}table.splits th,table.splits td{padding:10px 8px}}
+</style></head><body>
+<div class="container">
+<header class="app-header"><h1><span class="dot"></span>MCSR Ranked Pace Target</h1><div class="lang-toggle" id="sw"><button type="button" data-l="ja">日本語</button><button type="button" data-l="en" class="active">English</button></div></header>
+<div id="mainv">
+<div id="ld" class="notice" hidden><span lang="en">No data found (data/finishers.json). Load a JSON built by collect.py, or preview the UI with demo data.</span><span lang="ja">データ(data/finishers.json)が見つかりません。collect.py で作ったJSONを読み込むか、デモデータでUIを確認できます。</span><div class="row" style="margin-top:8px"><input type="file" id="fi"><button class="secondary" id="dmb" type="button">Show demo data</button></div></div>
+<div id="dm" class="notice" hidden></div>
+<section class="card"><h2><span><span lang="en">Target</span><span lang="ja">ターゲット</span></span><button type="button" class="help-toggle" aria-expanded="false" aria-label="help">?</button></h2>
+<div class="body"><div class="controls">
+<div class="field"><label><span lang="en">Target time</span><span lang="ja">目標タイム</span></label><div class="row"><input type="text" id="tt" aria-label="target finish time"><select id="rt" style="margin-left:8px"><option value="bastion">bastion-first</option><option value="fortress">fortress-first</option><option value="all">all</option></select></div>
+<div class="slider-row"><span class="endpoint" id="lo"></span><input type="range" id="sl" min="360000" max="1800000" step="10000" aria-label="target finish time slider"><span class="endpoint">30:00</span></div></div>
+<div class="field"><label><span lang="en">Reset strategy</span><span lang="ja">リセット戦略</span></label><select id="ps"><option value="aggressive"></option><option value="balanced" selected></option><option value="persistent"></option></select><div class="dsc" id="pdesc"></div></div></div>
+<div class="controls filters"><div class="field"><label><span lang="en">Season</span><span lang="ja">シーズン</span></label><select id="se"><option value="all">all</option></select></div>
+<div class="field"><label><span lang="en">Start type</span><span lang="ja">スタート形態</span></label><select id="ow"><option value="all">all</option><option value="0">Buried Treasure</option><option value="1">Shipwreck</option><option value="2">Village</option><option value="3">Ruined Portal</option><option value="4">Desert Temple</option></select></div>
+<div class="field"><label><span lang="en">Bastion type</span><span lang="ja">バスチオンタイプ</span></label><select id="bt"><option value="all">all</option><option value="0">Bridge Bastion</option><option value="1">Housing Bastion</option><option value="2">Stables Bastion</option><option value="3">Treasure Bastion</option></select></div></div>
+<div class="stat-line" id="info"></div></div>
+<div class="help-content" hidden><span lang="en"><p><strong>Target time</strong> = the finish time you are aiming for (sub-X).</p><p><strong>Reset strategy</strong> = how strict each split’s reset line is: strict early (cheap to redo), lenient late (more time already invested).</p><p><strong>Filters</strong> narrow the data to one season, start type or bastion type. Small samples show in parentheses.</p></span><span lang="ja"><p><strong>目標タイム</strong> = 完走したい時間(sub-13 など)。</p><p><strong>リセット戦略</strong> = 各スプリットの切り捨て基準。序盤は厳しく(やり直しが安い)、終盤は緩く(投入時間が大きい)。</p><p><strong>絞り込み</strong>でシーズン・スタート形態・バスチオンタイプ別のデータを見られる。サンプルが少ない値は括弧つきで表示。</p></span></div></section>
+<section class="card"><h2><span><span lang="en">Per-split targets</span><span lang="ja">各スプリットの目標値</span></span><button type="button" class="help-toggle" aria-expanded="false" aria-label="help">?</button></h2>
+<table class="splits"><thead><tr><th>split</th><th style="color:var(--accent-bright)"><span lang="en">Comfortable</span><span lang="ja">余裕</span><div class="sub">P≥80%</div></th><th><span lang="en">Standard</span><span lang="ja">標準</span><div class="sub">P≥50%</div></th><th style="color:var(--muted)"><span lang="en">Tight</span><span lang="ja">厳しめ</span><div class="sub">P≥20%</div></th><th id="rh" style="color:var(--warn)"></th></tr></thead><tbody id="tb"></tbody></table>
+<div class="body" id="ch" style="border-top:1px solid var(--border-soft)"></div>
+<div class="help-content" hidden><span lang="en"><p>Each value is the split time at which the chance of hitting the target crosses that level.</p><p><strong>Reset</strong> = “slower than this, the target is nearly impossible”. Continue if the previous split is under it; consider resetting if it is over.</p><p><strong>Selection bias:</strong> only finished runs are counted, so runners who reset early are missing and reset lines run slightly strict. — = no data.</p></span><span lang="ja"><p>各列の値は「そのスプリットをこの時間で抜けたなら、目標達成確率がその列のレベル以上」を意味する。</p><p><strong>リセット</strong> = 「これより遅いと目標達成はほぼ不可能」の目安。直前のスプリットがこれより速ければ続行、超えたらリセット検討。</p><p><strong>バイアス:</strong> 完走者のみのデータなので、早めにリセットした走者が含まれず、リセット閾値はやや厳しめに出る。— はデータなし。</p></span></div></section>
+<section class="card"><h2><span><span lang="en">Compare with runner</span><span lang="ja">ランナーの記録と比較</span></span><button type="button" class="help-toggle" aria-expanded="false" aria-label="help">?</button></h2>
+<div class="body"><div class="controls search"><div class="field"><label>MCID</label><div class="row"><input type="text" id="mc" placeholder="mcrtabot"><button class="primary" id="go" type="button"><span lang="en">Search</span><span lang="ja">検索</span></button></div></div>
+<div class="field"><label><span lang="en">Period</span><span lang="ja">対象期間</span></label><select id="pd"><option value="all"></option><option value="1y"></option><option value="6mo"></option><option value="3mo"></option><option value="1mo"></option></select></div></div><div id="cm"></div></div>
+<div class="help-content" hidden><span lang="en"><p><strong>Median</strong> = the runner’s typical split over finishes in the period. The line under it is the difference from the Standard column (+ = slower than target pace).</p><p><strong>Bar (pXX)</strong> = rank among runs that hit the target in the same period; p100 is fastest. For finish (PB), if the PB is above the target the bar is hidden and the shortfall is shown.</p></span><span lang="ja"><p><strong>中央値</strong> = 期間内の完走を対象にした、普段のスプリット。下の行は「標準」列との差(+ は目標ペースより遅い)。</p><p><strong>バー (pXX)</strong> = 同期間の目標達成者内での順位。p100 が最速。finish (PB) は PB が目標を超えている場合、バーの代わりに不足分を表示する。</p></span></div></section>
+</div>
+<div id="thanksv" hidden>
+<a class="back" href="#main">← <span lang="en">Back to pace targets</span><span lang="ja">ペース目標に戻る</span></a>
+<section class="card"><h2><span><span lang="en">Thanks &amp; credits</span><span lang="ja">謝辞・クレジット</span></span></h2>
+<div class="body">
+<p class="lead"><span lang="en">This site stands on the work of three people and the communities around them. Thank you.</span><span lang="ja">このサイトは、3人の方々の成果と、その周りのコミュニティの上に成り立っています。心から感謝します。</span></p>
+<div class="person"><h3>親ニワトリ</h3>
+<p><span lang="en">Creator of MCSR Pace Target Analysis, the site this one is modeled on. The idea of working backward from a target time to per-split targets and reset lines, and much of how the screen is organized, comes from it. Thank you for building it and sharing it with the community.</span><span lang="ja">本家「MCSR Pace Target Analysis」の制作者。目標タイムから各スプリットの目標値とリセット基準を逆算するという発想や、画面の組み立て方の多くは、本家から学びました。作って、みんなに公開してくれて、ありがとうございます。</span></p>
+<ul class="links"><li><a href="https://mcrtabot.github.io/mcsr-pace-target/" target="_blank" rel="noopener noreferrer"><span lang="en">MCSR Pace Target Analysis (the original site)</span><span lang="ja">MCSR Pace Target Analysis(本家のサイト)</span></a></li><li><a href="https://github.com/mcrtabot" target="_blank" rel="noopener noreferrer"><span lang="en">GitHub (mcrtabot)</span><span lang="ja">GitHub (mcrtabot)</span></a></li><li data-x="oya"></li></ul></div>
+<div class="person"><h3>RedLime <span class="dim" style="font-size:12px;font-weight:400">· <span lang="en">Lead developer &amp; co-owner</span><span lang="ja">メイン開発者・共同オーナー</span></span></h3>
+<p><span lang="en">Lead developer and co-owner of MCSR Ranked. Every number on this site comes from MCSR Ranked matches: the same-seed races, the per-split timelines and the public data behind them. Thank you for building a place where speedrunners can race, learn and compare.</span><span lang="ja">MCSR Rankedのメイン開発者・共同オーナー。このサイトの数字はすべて、MCSR Rankedの試合(同じシードでの対戦、区間ごとのタイムライン、その公開データ)から作っています。走者が競い、学び、比べられる場所を作ってくれて、ありがとうございます。</span></p>
+<ul class="links"><li><a href="https://github.com/RedLime" target="_blank" rel="noopener noreferrer"><span lang="en">GitHub (RedLime)</span><span lang="ja">GitHub (RedLime)</span></a></li><li data-x="redlime"></li></ul></div>
+<div class="person"><h3>OliverMCSR <span class="dim" style="font-size:12px;font-weight:400">· <span lang="en">Developer, co-owner &amp; event organizer</span><span lang="ja">開発者・共同オーナー・イベント主催</span></span></h3>
+<p><span lang="en">Developer, co-owner and event organizer of MCSR Ranked. Thank you for the ranked ladder and seasons, for the events you run for the community, and for the open data that made a tool like this possible.</span><span lang="ja">MCSR Rankedの開発者・共同オーナー・イベント主催。ランク戦とシーズンの運営、コミュニティのためのイベント、そしてデータを公開してくれていることに感謝します。このようなツールが作れるのは、そのおかげです。</span></p>
+<ul class="links"><li><a href="https://github.com/OliverMCSR" target="_blank" rel="noopener noreferrer">GitHub (OliverMCSR)</a></li><li data-x="oliver"></li></ul></div>
+<div class="person"><h3>MCSR Ranked</h3>
+<ul class="links"><li><a href="https://mcsrranked.com/" target="_blank" rel="noopener noreferrer"><span lang="en">MCSR Ranked (website)</span><span lang="ja">MCSR Ranked(公式サイト)</span></a></li><li><a href="https://mcsrranked.com/discord" target="_blank" rel="noopener noreferrer"><span lang="en">Discord community</span><span lang="ja">Discordコミュニティ</span></a></li><li><a href="https://modrinth.com/mod/mcsr-ranked" target="_blank" rel="noopener noreferrer"><span lang="en">The mod on Modrinth</span><span lang="ja">Modrinth上のMod</span></a></li><li><a href="https://docs.mcsrranked.com/" target="_blank" rel="noopener noreferrer"><span lang="en">API documentation</span><span lang="ja">APIドキュメント</span></a></li><li><a href="https://github.com/MCSR-Ranked" target="_blank" rel="noopener noreferrer">GitHub (MCSR-Ranked)</a></li><li data-x="mcsr"></li></ul></div>
+<p class="fine"><span lang="en">This is an unofficial, fan-made tool. It is not affiliated with or endorsed by MCSR Ranked or the author of the original site.</span><span lang="ja">これは非公式のファンメイドのツールです。MCSR Rankedおよび本家サイトの制作者とは関係がなく、公認を受けたものでもありません。</span></p>
+</div></section>
+</div>
+<footer><div id="ft"></div><div style="margin-top:8px"><span lang="en">Made possible by the work of others. <a href="#thanks">Thanks &amp; credits</a></span><span lang="ja">多くの方の成果のおかげで作れています。<a href="#thanks">謝辞・クレジット</a></span></div></footer><div id="err" class="err" style="text-align:center"></div></div>
+<script>
+
+
+const K=['nether','bastion','fortress','rod','blind','stronghold','end','dragon'],M=6e4,B=1e4,R5=5,HI=18e5;
+const NM={nether:'nether enter',bastion:'bastion',fortress:'fortress',rod:'first rod',blind:'blind',stronghold:'stronghold',end:'end enter',dragon:'dragon death',finish:'finish'};
+const ID={nether:'story.enter_the_nether',bastion:'nether.find_bastion',fortress:'nether.find_fortress',rod:'nether.obtain_blaze_rod',blind:'projectelo.timeline.blind_travel',stronghold:'story.follow_ender_eye',end:'story.enter_the_end',dragon:'projectelo.timeline.dragon_death',finish:'completion time'};
+const CAP={nether:10*M,bastion:12*M,fortress:15*M,rod:16*M,blind:18*M,stronghold:20*M,end:22*M,dragon:24*M},MG={nether:5*M,bastion:4*M,fortress:3*M,rod:2.5*M,blind:2*M,stronghold:M,end:M,dragon:M/2};
+const PS={aggressive:[.4,.3,.2,.16,.12,.06,.03,.02],balanced:[.25,.18,.12,.09,.06,.03,.02,.02],persistent:[.08,.05,.03,.025,.02,.02,.02,.02]};
+const fmt=ms=>ms==null?'—':Math.floor(ms/M)+':'+String(Math.floor(ms/1e3)%60).padStart(2,'0');
+const parse=s=>{const m=/^(\d{1,2})(?::([0-5]\d))?$/.exec(s.trim());return m?(+m[1]*60+ +(m[2]||0))*1e3:null};
+let C,N,LO=36e4,FAST=0,RN=[],RI=-1,NOW=0,LAST={},POP=null,PER={all:0,'1y':365,'6mo':182,'3mo':91,'1mo':30},$=id=>document.getElementById(id);
+function bins(idx,k,tg,mx){const col=C[k]||[],u=new Map,d=new Map;for(const i of idx){const v=col[i];if(v==null||v>mx)continue;const b=Math.floor(v/B)*B;u.set(b,(u.get(b)||0)+1);if(C.finish[i]<=tg)d.set(b,(d.get(b)||0)+1)}
+ return[...u.keys()].sort((a,b)=>a-b).map(b=>({lo:b,n:u.get(b),p:(d.get(b)||0)/u.get(b)}))}
+function thr(bs,rp){if(!bs.length)return{};let a=-1,o=-1;bs.forEach((b,i)=>{if(b.n>=R5&&b.p>o){o=b.p;a=i}});
+ if(a<0){a=0;o=bs[0].p;bs.forEach((b,i)=>{if(b.p>o){o=b.p;a=i}})}
+ const s=bs.map(b=>b.p);let c=s[a];for(let i=a+1;i<bs.length;i++){if(bs[i].n>=R5){c=Math.min(c,s[i]);s[i]=c}else s[i]=Math.min(s[i],c)}
+ const lv=x=>{for(let q=0;q<2;q++)for(let i=bs.length-1;i>=0;i--)if((q||bs[i].n>=R5)&&s[i]>=x)return{ms:bs[i].lo,lo:!!q};return null};
+ const rs=()=>{for(let q=0;q<2;q++)for(let i=a;i<bs.length;i++)if((q||bs[i].n>=R5)&&s[i]<rp)return{ms:bs[i].lo,lo:!!q};return null};
+ return{c:lv(.8),s:lv(.5),t:lv(.2),r:rs()}}
+const cell=(x,c)=>`<td><span class="${c}${x&&x.lo?' low-sample':''}">${x?fmt(x.ms):'—'}</span></td>`;
+const sub=k=>`<td class="split-name">${NM[k]}<div class="sub">${ID[k]}</div></td>`;
+function route(i,r){if(r==='all')return true;const b=C.bastion[i],f=C.fortress[i];if(b==null||f==null)return false;return r==='bastion'?b<f:f<b}
+const L=()=>document.documentElement.lang,T=(en,ja)=>L()==='ja'?ja:en;
+let ROWS=[],META=null,DEMO=false;
+const SH={nether:'nether',bastion:'bastion',fortress:'fort.',rod:'rod',blind:'blind',stronghold:'SH',end:'end',dragon:'dragon'};
+const PRL={aggressive:['Aggressive','攻め','40/30/20/16/12/6/3/2'],balanced:['Balanced','標準','25/18/12/9/6/3/2/2'],persistent:['Persistent','粘り','8/5/3/2.5/2/2/2/2']};
+const PD={aggressive:['Reset hard on slow early splits. Fewer finishes, but fast ones.','序盤の遅れはすぐ切る。完走数は減るが、速い走りが残る。'],balanced:['In between: cut clear early delays, commit late to bank the finish.','攻めと粘りの中間。序盤の明らかな遅れは切り、終盤は完走に振る。'],persistent:['Chase finish count: push on until the target is nearly impossible.','完走を積みたい人向け。可能性がほぼ無くなるまで走り切る。']};
+const PERL={all:['all time','全期間'],'1y':['last 1 year','直近 1年'],'6mo':['last 6 months','直近 6ヶ月'],'3mo':['last 3 months','直近 3ヶ月'],'1mo':['last 1 month','直近 1ヶ月']};
+function applyLang(){const j=L()==='ja'?1:0;
+ document.querySelectorAll('#sw button').forEach(b=>{const on=b.dataset.l===L();b.classList.toggle('active',on);b.setAttribute('aria-pressed',on)});
+ document.querySelectorAll('option[value=all]').forEach(o=>o.textContent=T('all','すべて'));
+ [...$('ps').options].forEach(o=>o.textContent=PRL[o.value][j]+' ('+PRL[o.value][2]+')');
+ [...$('pd').options].forEach(o=>o.textContent=PERL[o.value][j]);
+ META=meta;DEMO=demo;applyLang();
+ $('dm').textContent=T('Demo data (random numbers), not real MCSR Ranked records.','デモ用の乱数データです。実際のMCSR Rankedの記録ではありません。')}
+function setLang(l){document.documentElement.lang=l;try{localStorage.setItem('lang',l)}catch(e){}applyLang();if(C)draw()}
+function chart(){const W=700,H=270,Lm=46,Rm=12,Tm=12,Bm=30,n=K.length;let mx=0;ROWS.forEach(o=>['c','s','t','r'].forEach(q=>{if(o[q]&&o[q].ms>mx)mx=o[q].ms}));mx=Math.ceil(mx/12e4)*12e4||12*M;
+ const x=i=>Lm+(W-Lm-Rm)*i/(n-1),y=v=>Tm+(H-Tm-Bm)*(1-v/mx);let g='';
+ for(let q=0;q<=4;q++){const v=mx*q/4;g+=`<line x1="${Lm}" x2="${W-Rm}" y1="${y(v)}" y2="${y(v)}" stroke="var(--border-soft)"/><text x="${Lm-8}" y="${y(v)+4}" text-anchor="end" fill="var(--muted-dim)">${fmt(v)}</text>`}
+ K.forEach((k,i)=>g+=`<text x="${x(i)}" y="${H-10}" text-anchor="middle" fill="var(--muted-dim)">${SH[k]}</text>`);
+ [['c','--accent-bright',''],['s','--text',''],['t','--muted',''],['r','--warn','5 4']].forEach(([q,col,da])=>{const pts=ROWS.map((o,i)=>o[q]?[x(i),y(o[q].ms)]:null).filter(Boolean);if(pts.length){g+=`<polyline points="${pts.map(p=>p.join(',')).join(' ')}" fill="none" stroke="var(${col})" stroke-width="2" stroke-dasharray="${da}" stroke-linejoin="round"/>`+pts.map(p=>`<circle cx="${p[0]}" cy="${p[1]}" r="2.6" fill="var(${col})"/>`).join('')}});
+ const lg=[['--accent-bright','Comfortable','余裕',''],['--text','Standard','標準',''],['--muted','Tight','厳しめ',''],['--warn','Reset','リセット','dashed']].map(a=>`<span class="pace-chart-legend-item" style="color:var(${a[0]})"><span class="pace-chart-legend-swatch" style="border-top:2px ${a[3]||'solid'} var(${a[0]})"></span>${T(a[1],a[2])}</span>`).join('');
+ return`<div class="pace-chart-wrap"><svg class="pace-chart" viewBox="0 0 ${W} ${H}" width="100%">${g}</svg><div class="pace-chart-legend">${lg}</div></div>`}
+function draw(){const tg=+$('sl').value,r=$('rt').value,st=$('ow').value,bt=$('bt').value,se=$('se').value,pr=PS[$('ps').value],idx=[];
+ for(let i=0;i<N;i++)if(route(i,r)&&(st==='all'||C.start[i]==st)&&(bt==='all'||C.bastion_type[i]==bt)&&(se==='all'||C.season[i]==se))idx.push(i);
+ POP=new Uint8Array(N);idx.forEach(i=>POP[i]=1);const hit=idx.filter(i=>C.finish[i]<=tg).length,rn=r==='all'?'':r+' ';
+ $('info').innerHTML=`<strong>${hit.toLocaleString()}</strong> ${T('hits / ','完走(目標以内) / ')}<strong>${idx.length.toLocaleString()}</strong> ${rn}${T('finishes','完走')} <span class="dim">(${T('target','目標')} ${fmt(tg)} · ${T('fastest','最速')} ${fmt(FAST)})</span>`;
+ $('pdesc').textContent=PD[$('ps').value][L()==='ja'?1:0];
+ $('rh').innerHTML=T('Reset','リセット')+'<div class="sub">P&lt;'+Math.round(pr[0]*100)+'% → '+Math.round(pr[7]*100)+'%</div>';
+ ROWS=[];
+ $('tb').innerHTML=K.map((k,j)=>{const cap=Math.max(CAP[k],tg-MG[k]),bs=bins(idx,k,tg,cap),t=thr(bs,pr[j]);if(!t.r&&bs.length)t.r={ms:cap,lo:true};LAST[k]=t.s?t.s.ms:null;ROWS.push(t);
+  return`<tr>${sub(k)}${cell(t.c,'t-safe')}${cell(t.s,'t-mid')}${cell(t.t,'t-risky')}${cell(t.r,'reset')}</tr>`}).join('')+`<tr>${sub('finish')}<td>—</td>${cell({ms:tg},'t-mid')}<td>—</td><td>—</td></tr>`;
+ $('ch').innerHTML=chart();cmp()}
+function setT(ms){$('sl').value=ms;$('tt').value=fmt(ms);$('tt').className='';draw()}
+$('sl').oninput=e=>setT(+e.target.value);
+$('tt').onchange=e=>{const v=parse(e.target.value);if(v==null||v<LO||v>HI){e.target.className='bad';return}setT(v)};
+$('rt').onchange=$('ow').onchange=$('bt').onchange=$('se').onchange=$('ps').onchange=draw;
+function init(f,demo,meta){C=f.runs;N=C.finish.length;if(!C.start)C.start=new Array(N).fill(-1);if(!C.bastion_type)C.bastion_type=new Array(N).fill(-1);if(!C.season)C.season=new Array(N).fill(0);if(!C.runner_idx)C.runner_idx=new Array(N).fill(-1);if(!C.time)C.time=new Array(N).fill(0);RN=f.runners||[];RI=-1;$('cm').innerHTML='';NOW=0;for(const v of C.time)if(v>NOW)NOW=v;$('se').innerHTML='<option value="all">all</option>'+[...new Set(C.season)].filter(x=>x>0).sort((a,b)=>b-a).map(x=>`<option value="${x}">Season ${x}</option>`).join('');
+ let mn=Infinity;for(const v of C.finish)if(v<mn)mn=v;if(meta&&meta.record_ms)mn=Math.min(mn,meta.record_ms);
+ FAST=mn;LO=Math.floor(mn/B)*B;$('sl').min=LO;$('sl').max=Math.max(HI,LO+B);
+ const s=[...C.finish].sort((a,b)=>a-b),p25=s[Math.floor(s.length/4)];
+ $('ld').hidden=true;$('dm').hidden=!demo;$('lo').textContent=fmt(LO);$('ft').textContent=demo?'Demo data':'Data: MCSR Ranked API'+(meta&&meta.snapshot_date?' · as of '+meta.snapshot_date:'');setT(Math.min(HI,Math.max(LO,Math.round(p25/B)*B)))}
+function demoData(){let sd=7;const r=()=>(sd=sd*16807%2147483647)/2147483647,g=()=>r()+r()+r()-1.5,keys=[...K,'finish','start','bastion_type','season','runner_idx','time'],R={};keys.forEach(k=>R[k]=[]);
+ for(let i=0;i<5000;i++){const q=g(),o=Math.floor(r()*5),L=(a,b)=>Math.max(2e4,(a+b*q+g()*b*.6)*1e3);
+  let n=L(120+o*8,30),x=n+L(80,15),y=x+L(110,18);if(r()<.4)[x,y]=[y,x];
+  const ro=Math.max(x,y)+L(100,15),bl=ro+L(60,10),st=bl+L(130,20),en=st+L(150,25),dr=en+L(90,15),fi=dr+L(12,3);
+  [n,x,y,ro,bl,st,en,dr,fi].forEach((v,k)=>R[keys[k]].push(Math.round(v)));R.start.push(o);R.bastion_type.push(Math.floor(r()*4));R.season.push(9+Math.floor(r()*4));R.runner_idx.push(Math.floor(r()*300));R.time.push(17e8+Math.floor(r()*3e7))}
+ return{runs:R,runners:Array.from({length:300},(_,i)=>['demo'+String(i).padStart(3,'0'),'-'])}}
+function cmp(){if(RI<0)return;const tg=+$('sl').value,days=PER[$('pd').value],lim=days?NOW-days*86400:0,mine=[],pop=[];
+ for(let i=0;i<N;i++){if(C.time[i]<lim)continue;if(C.runner_idx[i]===RI)mine.push(i);if(POP[i]&&C.finish[i]<=tg)pop.push(i)}
+ const b=$('cm');if(!mine.length){b.innerHTML=`<div class="note">${T('No finishes in this period.','この期間の完走がありません。')}</div>`;return}
+ const hit=mine.filter(i=>C.finish[i]<=tg).length,med=a=>{a=a.filter(v=>v!=null).sort((x,y)=>x-y);return a.length?a[a.length>>1]:null};
+ const pc=(k,m)=>{const v=pop.map(i=>C[k][i]).filter(x=>x!=null);return v.length?Math.round(100*v.filter(x=>x>m).length/v.length):null};
+ const pctl=p=>p==null?'':`<div class="delta">p${p}</div><div class="pctl-bar"><div style="width:${p}%"></div></div>`;
+ const card=(k,m,st,extra)=>{const d=st==null||m==null?null:m-st;return`<div class="user-stat"><div class="label">${NM[k]}${k==='finish'?' (PB)':''}</div><div class="value">${m==null?'—':fmt(m)}</div><div class="delta ${d==null?'':d>0?'slower':'faster'}">${d==null?'&nbsp;':(d>0?'+':'−')+fmt(Math.abs(d))+' '+T('vs standard','標準比')}</div>${extra??(m==null?'':pctl(pc(k,m)))}</div>`};
+ const pb=Math.min(...mine.map(i=>C.finish[i]));
+ b.innerHTML=`<div class="stat-line" style="margin:0 0 4px;padding:0;border:0"><strong>${RN[RI][0]}</strong> · ${mine.length} ${T('finishes','完走')} (${hit} ${T('hit target','目標達成')})${mine.length<5?' · '+T('low sample','サンプル少'):''}</div><div class="user-stats">`+K.map(k=>card(k,med(mine.map(i=>C[k][i])),LAST[k])).join('')+card('finish',pb,tg,pb>tg?`<div class="delta slower">${fmt(pb-tg)} ${T('short of target','目標まで不足')}</div>`:undefined)+'</div>'}
+function find(){const q=$('mc').value.trim().toLowerCase(),j=RN.findIndex(r=>r&&String(r[0]).toLowerCase()===q);if(j<0){RI=-1;$('cm').innerHTML=`<div class="note err">${T('MCID not found in the data.','データにこのMCIDが見つかりません。')}</div>`;return}RI=j;cmp()}
+$('go').onclick=find;$('mc').onkeydown=e=>{if(e.key==='Enter')find()};$('pd').onchange=cmp;
+$('fi').onchange=e=>e.target.files[0].text().then(t=>init(JSON.parse(t),false,null)).catch(x=>$('err').textContent='Load failed: '+x.message);
+$('dmb').onclick=()=>init(demoData(),true,null);
+Promise.all([fetch('data/finishers.json'),fetch('data/meta.json').catch(()=>null)]).then(async([a,b])=>{if(!a.ok)throw 0;const f=await a.json();let m=null;try{m=b&&b.ok?await b.json():null}catch(e){}init(f,false,m)}).catch(()=>{$('ld').hidden=false});
+$('sw').onclick=e=>{const b=e.target.closest('button');if(b)setLang(b.dataset.l)};
+document.querySelectorAll('.help-toggle').forEach(b=>b.onclick=()=>{const h=b.closest('.card').querySelector('.help-content');h.hidden=!h.hidden;b.setAttribute('aria-expanded',String(!h.hidden))});
+const XL={oya:'https://x.com/oyaniwatori',redlime:'https://x.com/RedLimeRL',oliver:'https://x.com/Olivermcsr',mcsr:'https://x.com/mcsr_ranked'}; // X(旧Twitter)のURLを入れるとリンクが表示される。例: 'https://x.com/ユーザー名'
+document.querySelectorAll('[data-x]').forEach(li=>{const u=XL[li.dataset.x];if(/^https:\/\/(x|twitter)\.com\//.test(u||''))li.innerHTML=`<a href="${u}" target="_blank" rel="noopener noreferrer">X</a>`;else li.remove()});
+function view(){const t=location.hash==='#thanks';$('mainv').hidden=t;$('thanksv').hidden=!t;if(t)scrollTo(0,0)}
+addEventListener('hashchange',view);view();
+{let l0='en';try{l0=localStorage.getItem('lang')||'en'}catch(e){}document.documentElement.lang=l0==='ja'?'ja':'en';applyLang()}
+</script></body></html>
