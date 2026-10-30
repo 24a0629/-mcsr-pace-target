@@ -71,7 +71,7 @@ footer{text-align:center;color:var(--muted-dim);margin-top:32px;font-size:12px}
 <div class="help-content" hidden><span lang="en"><p>Each value is the split time at which the chance of hitting the target crosses that level.</p><p><strong>Reset</strong> = “slower than this, the target is nearly impossible”. Continue if the previous split is under it; consider resetting if it is over.</p><p><strong>Selection bias:</strong> only finished runs are counted, so runners who reset early are missing and reset lines run slightly strict. — = no data.</p></span><span lang="ja"><p>各列の値は「そのスプリットをこの時間で抜けたなら、目標達成確率がその列のレベル以上」を意味する。</p><p><strong>リセット</strong> = 「これより遅いと目標達成はほぼ不可能」の目安。直前のスプリットがこれより速ければ続行、超えたらリセット検討。</p><p><strong>バイアス:</strong> 完走者のみのデータなので、早めにリセットした走者が含まれず、リセット閾値はやや厳しめに出る。— はデータなし。</p></span></div></section>
 <section class="card"><h2><span><span lang="en">Compare with runner</span><span lang="ja">ランナーの記録と比較</span></span><button type="button" class="help-toggle" aria-expanded="false" aria-label="help">?</button></h2>
 <div class="body"><div class="controls search"><div class="field"><label>MCID</label><div class="row"><input type="text" id="mc" placeholder="mcrtabot"><button class="primary" id="go" type="button"><span lang="en">Search</span><span lang="ja">検索</span></button></div></div>
-<div class="field"><label><span lang="en">Period</span><span lang="ja">対象期間</span></label><select id="pd"><option value="all"></option><option value="1y"></option><option value="6mo"></option><option value="3mo"></option><option value="1mo"></option></select></div></div><div id="cm"></div></div>
+<div class="field"><label><span lang="en">Period</span><span lang="ja">対象期間</span></label><select id="pd"><option value="all"></option><option value="s3"></option><option value="s2"></option><option value="s1"></option><option value="d30"></option></select></div></div><div id="cm"></div></div>
 <div class="help-content" hidden><span lang="en"><p><strong>Median</strong> = the runner’s typical split over finishes in the period. The line under it is the difference from the Standard column (+ = slower than target pace).</p><p><strong>Bar (pXX)</strong> = rank among runs that hit the target in the same period; p100 is fastest. For finish (PB), if the PB is above the target the bar is hidden and the shortfall is shown.</p></span><span lang="ja"><p><strong>中央値</strong> = 期間内の完走を対象にした、普段のスプリット。下の行は「標準」列との差(+ は目標ペースより遅い)。</p><p><strong>バー (pXX)</strong> = 同期間の目標達成者内での順位。p100 が最速。finish (PB) は PB が目標を超えている場合、バーの代わりに不足分を表示する。</p></span></div></section>
 </div>
 <div id="thanksv" hidden>
@@ -104,7 +104,7 @@ const CAP={nether:10*M,bastion:12*M,fortress:15*M,rod:16*M,blind:18*M,stronghold
 const PS={aggressive:[.4,.3,.2,.16,.12,.06,.03,.02],balanced:[.25,.18,.12,.09,.06,.03,.02,.02],persistent:[.08,.05,.03,.025,.02,.02,.02,.02]};
 const fmt=ms=>ms==null?'—':Math.floor(ms/M)+':'+String(Math.floor(ms/1e3)%60).padStart(2,'0');
 const parse=s=>{const m=/^(\d{1,2})(?::([0-5]\d))?$/.exec(s.trim());return m?(+m[1]*60+ +(m[2]||0))*1e3:null};
-let C,N,LO=36e4,FAST=0,RN=[],RI=-1,NOW=0,LAST={},POP=null,PER={all:0,'1y':365,'6mo':182,'3mo':91,'1mo':30},$=id=>document.getElementById(id);
+let C,N,LO=36e4,FAST=0,RN=[],RI=-1,NOW=0,LAST={},POP=null,CURS=0,$=id=>document.getElementById(id);
 function bins(idx,k,tg,mx){const col=C[k]||[],u=new Map,d=new Map;for(const i of idx){const v=col[i];if(v==null||v>mx)continue;const b=Math.floor(v/B)*B;u.set(b,(u.get(b)||0)+1);if(C.finish[i]<=tg)d.set(b,(d.get(b)||0)+1)}
  return[...u.keys()].sort((a,b)=>a-b).map(b=>({lo:b,n:u.get(b),p:(d.get(b)||0)/u.get(b)}))}
 function thr(bs,rp){if(!bs.length)return{};let a=-1,o=-1;bs.forEach((b,i)=>{if(b.n>=R5&&b.p>o){o=b.p;a=i}});
@@ -121,7 +121,7 @@ let ROWS=[],META=null,DEMO=false;
 const SH={nether:'nether',bastion:'bastion',fortress:'fort.',rod:'rod',blind:'blind',stronghold:'SH',end:'end',dragon:'dragon'};
 const PRL={aggressive:['Aggressive','攻め','40/30/20/16/12/6/3/2'],balanced:['Balanced','標準','25/18/12/9/6/3/2/2'],persistent:['Persistent','粘り','8/5/3/2.5/2/2/2/2']};
 const PD={aggressive:['Reset hard on slow early splits. Fewer finishes, but fast ones.','序盤の遅れはすぐ切る。完走数は減るが、速い走りが残る。'],balanced:['In between: cut clear early delays, commit late to bank the finish.','攻めと粘りの中間。序盤の明らかな遅れは切り、終盤は完走に振る。'],persistent:['Chase finish count: push on until the target is nearly impossible.','完走を積みたい人向け。可能性がほぼ無くなるまで走り切る。']};
-const PERL={all:['all time','全期間'],'1y':['last 1 year','直近 1年'],'6mo':['last 6 months','直近 6ヶ月'],'3mo':['last 3 months','直近 3ヶ月'],'1mo':['last 1 month','直近 1ヶ月']};
+const PERL={all:['All seasons','全シーズン'],s3:['Last 3 seasons (≈ 1 year)','直近3シーズン(約1年)'],s2:['Last 2 seasons (≈ 8 months)','直近2シーズン(約8ヶ月)'],s1:['This season (≈ 4 months)','今シーズン(約4ヶ月)'],d30:['Past 30 days','直近30日']};
 function applyLang(){const j=L()==='ja'?1:0;
  document.querySelectorAll('#sw button').forEach(b=>{const on=b.dataset.l===L();b.classList.toggle('active',on);b.setAttribute('aria-pressed',on)});
  document.querySelectorAll('option[value=all]').forEach(o=>o.textContent=T('all','すべて'));
@@ -151,7 +151,7 @@ function setT(ms){$('sl').value=ms;$('tt').value=fmt(ms);$('tt').className='';dr
 $('sl').oninput=e=>setT(+e.target.value);
 $('tt').onchange=e=>{const v=parse(e.target.value);if(v==null||v<LO||v>HI){e.target.className='bad';return}setT(v)};
 $('rt').onchange=$('ow').onchange=$('bt').onchange=$('se').onchange=$('ps').onchange=draw;
-function init(f,demo,meta){C=f.runs;N=C.finish.length;if(!C.start)C.start=new Array(N).fill(-1);if(!C.bastion_type)C.bastion_type=new Array(N).fill(-1);if(!C.season)C.season=new Array(N).fill(0);if(!C.runner_idx)C.runner_idx=new Array(N).fill(-1);if(!C.time)C.time=new Array(N).fill(0);RN=f.runners||[];RI=-1;$('cm').innerHTML='';NOW=0;for(const v of C.time)if(v>NOW)NOW=v;$('se').innerHTML='<option value="all">all</option>'+[...new Set(C.season)].filter(x=>x>0).sort((a,b)=>b-a).map(x=>`<option value="${x}">Season ${x}</option>`).join('');
+function init(f,demo,meta){C=f.runs;N=C.finish.length;if(!C.start)C.start=new Array(N).fill(-1);if(!C.bastion_type)C.bastion_type=new Array(N).fill(-1);if(!C.season)C.season=new Array(N).fill(0);if(!C.runner_idx)C.runner_idx=new Array(N).fill(-1);if(!C.time)C.time=new Array(N).fill(0);RN=f.runners||[];RI=-1;$('cm').innerHTML='';NOW=0;for(const v of C.time)if(v>NOW)NOW=v;CURS=0;for(const v of C.season)if(v>CURS)CURS=v;$('se').innerHTML='<option value="all">all</option>'+[...new Set(C.season)].filter(x=>x>0).sort((a,b)=>b-a).map(x=>`<option value="${x}">Season ${x}</option>`).join('');
  let mn=Infinity;for(const v of C.finish)if(v<mn)mn=v;if(meta&&meta.record_ms)mn=Math.min(mn,meta.record_ms);
  FAST=mn;LO=Math.floor(mn/B)*B;$('sl').min=LO;$('sl').max=Math.max(HI,LO+B);
  const s=[...C.finish].sort((a,b)=>a-b),p25=s[Math.floor(s.length/4)];
@@ -162,8 +162,8 @@ function demoData(){let sd=7;const r=()=>(sd=sd*16807%2147483647)/2147483647,g=(
   const ro=Math.max(x,y)+L(100,15),bl=ro+L(60,10),st=bl+L(130,20),en=st+L(150,25),dr=en+L(90,15),fi=dr+L(12,3);
   [n,x,y,ro,bl,st,en,dr,fi].forEach((v,k)=>R[keys[k]].push(Math.round(v)));R.start.push(o);R.bastion_type.push(Math.floor(r()*4));R.season.push(9+Math.floor(r()*4));R.runner_idx.push(Math.floor(r()*300));R.time.push(17e8+Math.floor(r()*3e7))}
  return{runs:R,runners:Array.from({length:300},(_,i)=>['demo'+String(i).padStart(3,'0'),'-'])}}
-function cmp(){if(RI<0)return;const tg=+$('sl').value,days=PER[$('pd').value],lim=days?NOW-days*86400:0,mine=[],pop=[];
- for(let i=0;i<N;i++){if(C.time[i]<lim)continue;if(C.runner_idx[i]===RI)mine.push(i);if(POP[i]&&C.finish[i]<=tg)pop.push(i)}
+function cmp(){if(RI<0)return;const tg=+$('sl').value,pv=$('pd').value,ns=pv[0]==='s'?+pv.slice(1):0,ms=ns?CURS-ns+1:-1,lim=pv==='d30'?NOW-30*86400:0,mine=[],pop=[];
+ for(let i=0;i<N;i++){if(C.time[i]<lim||C.season[i]<ms)continue;if(C.runner_idx[i]===RI)mine.push(i);if(POP[i]&&C.finish[i]<=tg)pop.push(i)}
  const b=$('cm');if(!mine.length){b.innerHTML=`<div class="note">${T('No finishes in this period.','この期間の完走がありません。')}</div>`;return}
  const hit=mine.filter(i=>C.finish[i]<=tg).length,med=a=>{a=a.filter(v=>v!=null).sort((x,y)=>x-y);return a.length?a[a.length>>1]:null};
  const pc=(k,m)=>{const v=pop.map(i=>C[k][i]).filter(x=>x!=null);return v.length?Math.round(100*v.filter(x=>x>m).length/v.length):null};
