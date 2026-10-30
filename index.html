@@ -100,7 +100,7 @@ footer{text-align:center;color:var(--muted-dim);margin-top:32px;font-size:12px}
 const K=['nether','bastion','fortress','rod','blind','stronghold','end','dragon'],M=6e4,B=1e4,R5=5,HI=18e5;
 const NM={nether:'nether enter',bastion:'bastion',fortress:'fortress',rod:'first rod',blind:'blind',stronghold:'stronghold',end:'end enter',dragon:'dragon death',finish:'finish'};
 const ID={nether:'story.enter_the_nether',bastion:'nether.find_bastion',fortress:'nether.find_fortress',rod:'nether.obtain_blaze_rod',blind:'projectelo.timeline.blind_travel',stronghold:'story.follow_ender_eye',end:'story.enter_the_end',dragon:'projectelo.timeline.dragon_death',finish:'completion time'};
-const CAP={nether:10*M,bastion:12*M,fortress:15*M,rod:16*M,blind:18*M,stronghold:20*M,end:22*M,dragon:24*M},MG={nether:5*M,bastion:4*M,fortress:3*M,rod:2.5*M,blind:2*M,stronghold:M,end:M,dragon:M/2};
+const CAP={nether:10*M,bastion:12*M,fortress:15*M,rod:16*M,blind:18*M,stronghold:20*M,end:22*M,dragon:24*M},MG={nether:5*M,bastion:4*M,fortress:3*M,rod:2.5*M,blind:2*M,stronghold:M/2,end:M/4,dragon:M/2};
 const PS={aggressive:[.4,.3,.2,.16,.12,.06,.03,.02],balanced:[.25,.18,.12,.09,.06,.03,.02,.02],persistent:[.08,.05,.03,.025,.02,.02,.02,.02]};
 const fmt=ms=>ms==null?'—':Math.floor(ms/M)+':'+String(Math.floor(ms/1e3)%60).padStart(2,'0');
 const parse=s=>{const m=/^(\d{1,2})(?::([0-5]\d))?$/.exec(s.trim());return m?(+m[1]*60+ +(m[2]||0))*1e3:null};
@@ -130,11 +130,11 @@ function applyLang(){const j=L()==='ja'?1:0;
  META=meta;DEMO=demo;applyLang();
  $('dm').textContent=T('Demo data (random numbers), not real MCSR Ranked records.','デモ用の乱数データです。実際のMCSR Rankedの記録ではありません。')}
 function setLang(l){document.documentElement.lang=l;try{localStorage.setItem('lang',l)}catch(e){}applyLang();if(C)draw()}
-function chart(){const W=700,H=270,Lm=46,Rm=12,Tm=12,Bm=30,n=K.length;let mx=0;ROWS.forEach(o=>['c','s','t','r'].forEach(q=>{if(o[q]&&o[q].ms>mx)mx=o[q].ms}));mx=Math.ceil(mx/12e4)*12e4||12*M;
+function chart(tg){const W=700,H=270,Lm=46,Rm=12,Tm=12,Bm=30,names=['start',...K,'finish'],n=names.length;let mx=tg;ROWS.forEach(o=>['c','s','t','r'].forEach(q=>{if(o[q]&&o[q].ms>mx)mx=o[q].ms}));mx=Math.ceil(mx/12e4)*12e4;
  const x=i=>Lm+(W-Lm-Rm)*i/(n-1),y=v=>Tm+(H-Tm-Bm)*(1-v/mx);let g='';
  for(let q=0;q<=4;q++){const v=mx*q/4;g+=`<line x1="${Lm}" x2="${W-Rm}" y1="${y(v)}" y2="${y(v)}" stroke="var(--border-soft)"/><text x="${Lm-8}" y="${y(v)+4}" text-anchor="end" fill="var(--muted-dim)">${fmt(v)}</text>`}
- K.forEach((k,i)=>g+=`<text x="${x(i)}" y="${H-10}" text-anchor="middle" fill="var(--muted-dim)">${SH[k]}</text>`);
- [['c','--accent-bright',''],['s','--text',''],['t','--muted',''],['r','--warn','5 4']].forEach(([q,col,da])=>{const pts=ROWS.map((o,i)=>o[q]?[x(i),y(o[q].ms)]:null).filter(Boolean);if(pts.length){g+=`<polyline points="${pts.map(p=>p.join(',')).join(' ')}" fill="none" stroke="var(${col})" stroke-width="2" stroke-dasharray="${da}" stroke-linejoin="round"/>`+pts.map(p=>`<circle cx="${p[0]}" cy="${p[1]}" r="2.6" fill="var(${col})"/>`).join('')}});
+ names.forEach((k,i)=>g+=`<text x="${x(i)}" y="${H-10}" text-anchor="middle" fill="var(--muted-dim)">${SH[k]||k}</text>`);
+ [['c','--accent-bright',''],['s','--text',''],['t','--muted',''],['r','--warn','5 4']].forEach(([q,col,da])=>{const pts=[[x(0),y(0)],...ROWS.map((o,i)=>o[q]?[x(i+1),y(o[q].ms)]:null).filter(Boolean),[x(n-1),y(tg)]];g+=`<polyline points="${pts.map(p=>p.join(',')).join(' ')}" fill="none" stroke="var(${col})" stroke-width="2" stroke-dasharray="${da}" stroke-linejoin="round"/>`+pts.map(p=>`<circle cx="${p[0]}" cy="${p[1]}" r="2.6" fill="var(${col})"/>`).join('')});
  const lg=[['--accent-bright','Comfortable','余裕',''],['--text','Standard','標準',''],['--muted','Tight','厳しめ',''],['--warn','Reset','リセット','dashed']].map(a=>`<span class="pace-chart-legend-item" style="color:var(${a[0]})"><span class="pace-chart-legend-swatch" style="border-top:2px ${a[3]||'solid'} var(${a[0]})"></span>${T(a[1],a[2])}</span>`).join('');
  return`<div class="pace-chart-wrap"><svg class="pace-chart" viewBox="0 0 ${W} ${H}" width="100%">${g}</svg><div class="pace-chart-legend">${lg}</div></div>`}
 function draw(){const tg=+$('sl').value,r=$('rt').value,st=$('ow').value,bt=$('bt').value,se=$('se').value,pr=PS[$('ps').value],idx=[];
@@ -146,7 +146,7 @@ function draw(){const tg=+$('sl').value,r=$('rt').value,st=$('ow').value,bt=$('b
  ROWS=[];
  $('tb').innerHTML=K.map((k,j)=>{const cap=Math.max(CAP[k],tg-MG[k]),bs=bins(idx,k,tg,cap),t=thr(bs,pr[j]);if(!t.r&&bs.length)t.r={ms:cap,lo:true};LAST[k]=t.s?t.s.ms:null;ROWS.push(t);
   return`<tr>${sub(k)}${cell(t.c,'t-safe')}${cell(t.s,'t-mid')}${cell(t.t,'t-risky')}${cell(t.r,'reset')}</tr>`}).join('')+`<tr>${sub('finish')}<td>—</td>${cell({ms:tg},'t-mid')}<td>—</td><td>—</td></tr>`;
- $('ch').innerHTML=chart();cmp()}
+ $('ch').innerHTML=chart(tg);cmp()}
 function setT(ms){$('sl').value=ms;$('tt').value=fmt(ms);$('tt').className='';draw()}
 $('sl').oninput=e=>setT(+e.target.value);
 $('tt').onchange=e=>{const v=parse(e.target.value);if(v==null||v<LO||v>HI){e.target.className='bad';return}setT(v)};

@@ -1,15 +1,17 @@
-# MCSR Ranked Pace Target(自分用・手元で動かす版)
-公開はしない前提。GitHub Pages / GitHub Actions は使いません。
+# MCSR Ranked Pace Target
+GitHub Pages + GitHub Actions で、データ収集から公開までを自動で回す。
 
-## 使い方(管理者権限不要・Python 3 のみ)
-1. この中身を好きなフォルダに展開する。
-2. `collect.bat` をダブルクリック → 約25分でデータ収集 → `data/finishers.json` を生成。何度でも実行でき、続きから再開する。
-3. `view.bat` をダブルクリック → ブラウザで http://127.0.0.1:8000/ が開く(自分のPCからしか見えない)。
+## セットアップ
+1. 公開リポジトリのルートに `index.html` / `collect.py` / `README.md` / `.gitignore` を置く。
+2. `.github/workflows/update.yml` は「Add file → Create new file」で名前欄に `.github/workflows/update.yml` と入力して貼り付ける。
+3. Settings → Pages → Source を「GitHub Actions」にする。
+4. Actions → update-data → Run workflow で初回実行(以後は3時間ごとに自動)。
+5. 公開URL: `https://<ユーザー名>.github.io/<リポジトリ名>/`
+
+## データの置き場所
+- リポジトリのルートに `data/` は無くてよい。蓄積データは `data` ブランチ(recent.jsonl / archive/ / runners.json / state.json)に自動で保存される(毎回1コミットに上書きするので履歴は増えない)。
+- `data` ブランチを消すと集め直しになる。
 
 ## メモ
-- データは `data/` に蓄積される(recent.jsonl / archive/ / runners.json / state.json)。消えると集め直しになるので、ときどきフォルダごとコピーしてバックアップ。
 - 収集が遅いのはAPIの上限(10分で500リクエスト)のため。実行回数を増やすほど古いシーズンまで遡れる。
-- 自動実行したいときは、Windowsのタスクスケジューラ(ユーザー権限)で `collect.bat` を定期実行する。
-- Claude上の公開ページ(自分だけが見られるプレビュー)に `data/finishers.json` を読み込ませて使うこともできる。リンクは共有しないこと。
-
-サイト下部の「Thanks & credits」は同じページ内の `#thanks` 表示。XのURLなどは index.html 内の `XL` で変更できる。
+- サイト下部の「Thanks & credits」は同じページ内の `#thanks` 表示。XのURLなどは index.html 内の `XL` で変更できる。
