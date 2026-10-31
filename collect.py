@@ -1,29 +1,36 @@
 #!/usr/bin/env python3
-"""MCSR Ranked のランク戦から完走データを集めて蓄積する(標準ライブラリのみ・管理者権限不要)。
+"""MCSR Ranked のランク戦のデータを集めて蓄積する(標準ライブラリのみ・管理者権限不要)。
   python collect.py fetch [--minutes 25]   # 何度でも再実行OK(続きから再開)
   python collect.py build [--days 14]      # 古い試合を数値だけ(走者は番号)の archive に移し、finishers.json / meta.json を生成
-収集の優先順: ①最新の試合(既知の範囲まで) → ②古い試合を新しい順に遡る(シーズンをまたいで続きから再開)"""
+収集の優先順: ①最新の試合(既知の範囲まで) → ②古い試合を新しい順に遡る(シーズンをまたいで続きから再開)
+保存するのは、完走した人だけでなく、その試合の「全員」(完走しなかった人の区間タイムと、試合の終了時刻を含む)。"""
 import json, time, datetime, argparse, urllib.request, urllib.error
 from pathlib import Path
 
 API = "https://api.mcsrranked.com"
 D = Path("data"); A = D / "archive"; A.mkdir(parents=True, exist_ok=True)
-RECENT, STATE = D / "recent.jsonl", D / "state.json"
-SLEEP = 1.3  # 公式の上限 500 req / 10 min に収まる間隔
+RECENT, STATE, RUNNERS = D / "recent.jsonl", D / "state.json", D / "runners.json"
+SLEEP = 1.3        # 公式の上限 500 req / 10 min に収まる間隔
+MIN_END = 360000   # これより短く終わった途中棄権の試合は、目標タイムの対象外なので詳細を取らない(6:00)
 EV = {"nether": "story.enter_the_nether", "bastion": "nether.find_bastion",
       "fortress": "nether.find_fortress", "rod": "nether.obtain_blaze_rod",
       "blind": "projectelo.timeline.blind_travel", "stronghold": "story.follow_ender_eye",
       "end": "story.enter_the_end", "dragon": "projectelo.timeline.dragon_death"}
-KEYS = list(EV)  # finish は completions の時間
+KEYS = list(EV)
 OW = ["BURIED_TREASURE", "SHIPWRECK", "VILLAGE", "RUINED_PORTAL", "DESERT_TEMPLE"]  # index.html と対応
 BT = ["BRIDGE", "HOUSING", "STABLES", "TREASURE"]                                  # index.html と対応
-COLS = ["runner_idx", "season", "time", "start", "bastion_type", "finish", *KEYS]  # archive に残す数値列(走者は番号だけ)
-RUNNERS = D / "runners.json"  # 走者番号 → [ニックネーム, UUID, 最終試合日]
+# archive / finishers.json の列(1行 = 1人の1回の走り)
+#   finish: 完走タイム(完走しなかった人は None)  mend: その試合が終わった時刻(ms)。区間の "end" とは別の列
+#   elo: 試合前のElo(推定)  elo_pl: 試合データの players にあるElo(そのまま)  full: 1=全員分を記録した試合
+#   bg: ビギナー戦  bot: bot由来
+COLS = ["runner_idx", "season", "time", "start", "bastion_type", "finish", "mend", "elo", "elo_pl",
+        "full", "bg", "bot", *KEYS]
+DEFAULT = {"full": 0}  # 旧形式の archive で欠けている列の既定値(それ以外は None)
 
 def get(path):
     for k in range(5):
         try:
-            req = urllib.request.Request(API + path, headers={"User-Agent": "mcsr-ranked-pace/0.4"})
+            req = urllib.request.Request(API + path, headers={"User-Agent": "mcsr-ranked-pace/0.5"})
             with urllib.request.urlopen(req, timeout=30) as r:
                 j = json.load(r)
             time.sleep(SLEEP)
@@ -39,23 +46,28 @@ def get(path):
     raise RuntimeError("API error: " + path)
 
 def rows(m):
-    names = {p["uuid"]: p["nickname"] for p in m["players"]}
+    """試合の全員分。[ニックネーム, UUID, 完走タイム|None, 試合前Elo(推定)|None, playersのElo|None, 区間8つ]"""
+    comp = {c["uuid"]: c["time"] for c in m.get("completions") or []}
+    chg = {c["uuid"]: c for c in m.get("changes") or []}
     out = []
-    for c in m.get("completions") or []:
-        u, first = c["uuid"], {}
+    for p in m["players"]:
+        u = p["uuid"]
+        c = chg.get(u) or {}
+        # changes の eloRate は試合後の値と見て、変動を引いて試合前を出す(実データで要確認)
+        pre = c["eloRate"] - c["change"] if c.get("eloRate") is not None and c.get("change") is not None else None
+        first = {}
         for t in m.get("timelines") or []:
             if t["uuid"] == u and t["type"] in EV.values():
                 first[t["type"]] = min(first.get(t["type"], t["time"]), t["time"])
-        out.append([names.get(u, "?"), u, c["time"]] + [first.get(EV[k]) for k in KEYS])
+        out.append([p["nickname"], u, comp.get(u), pre, p.get("eloRate")] + [first.get(EV[k]) for k in KEYS])
     return out
 
-def start_of(m):
-    v = (m.get("seed") or {}).get("overworld")
-    return OW.index(v) if v in OW else -1
+def _pick(d, key, alt, lst):
+    v = (d.get("seed") or {}).get(key) or d.get(alt)
+    return lst.index(v) if v in lst else -1
 
-def bastion_of(m):
-    v = (m.get("seed") or {}).get("nether")
-    return BT.index(v) if v in BT else -1
+def start_of(d): return _pick(d, "overworld", "seedType", OW)
+def bastion_of(d): return _pick(d, "nether", "bastionType", BT)
 
 def load_seen():
     seen = set()
@@ -73,15 +85,19 @@ def fetch(minutes):
     st = json.loads(STATE.read_text()) if STATE.exists() else {}
     n, info = [0], {}
 
-    def put(f, m):
-        skip = m.get("forfeited") or m.get("decayed")
+    def put(f, m):  # m: 一覧の1件(MatchInfo)
+        skip = m.get("decayed") or (m.get("forfeited") and (m.get("result") or {}).get("time", 0) < MIN_END)
         d = None
         if not skip:
             try: d = get(f"/matches/{m['id']}")
             except urllib.error.HTTPError as e: print("skip", m["id"], e.code); skip = True
-        rec = {"id": m["id"], "date": m["date"], "season": m["season"],
-               "ow": -1 if skip else start_of(d), "bt": -1 if skip else bastion_of(d),
-               "rows": [] if skip else rows(d)}
+        rec = {"v": 2, "id": m["id"], "date": m["date"], "season": m["season"]}
+        if d is not None:
+            rec.update(ow=start_of(d), bt=bastion_of(d), end=(d.get("result") or {}).get("time"),
+                       ff=bool(d.get("forfeited")), bg=int(bool(d.get("beginner"))),
+                       bot=int(d.get("botSource") is not None), rows=rows(d))
+        else:
+            rec.update(ow=-1, bt=-1, end=None, ff=bool(m.get("forfeited")), bg=0, bot=0, rows=[])
         f.write(json.dumps(rec, ensure_ascii=False) + "\n"); f.flush()
         seen.add(m["id"]); n[0] += 1
 
@@ -136,18 +152,32 @@ def build(days):
     runners = {}
     if RUNNERS.exists():
         for i, (nk, u, d) in enumerate(json.loads(RUNNERS.read_text(encoding="utf-8"))): runners[u] = [i, nk, d]
-    def vals(m, nick, uuid, fin, sp):
-        return [rid(runners, uuid, nick, m["date"]), m["season"], m["date"], m["ow"], m.get("bt", -1), fin, *sp]
+
+    def vals(m, row):  # COLS の順に並べた値
+        if m.get("v", 1) >= 2:
+            nick, uuid, fin, pre, pl, *sp = row
+            elo = pre if pre is not None else pl
+            tail = [m.get("end"), elo, pl, 1, m.get("bg", 0), m.get("bot", 0)]
+        else:  # 旧形式(完走者だけ)
+            nick, uuid, fin, *sp = row
+            tail = [None, None, None, 0, 0, 0]
+        return [rid(runners, uuid, nick, m["date"]), m["season"], m["date"], m["ow"], m.get("bt", -1), fin, *tail, *sp]
+
     keep, arch, R = [], {}, {c: [] for c in COLS}
+    stat = {"matches": 0, "multi_finish": 0, "no_finish": 0}
     if RECENT.exists():
         for l in RECENT.open(encoding="utf-8"):
             m = json.loads(l)
+            if m["rows"]:
+                stat["matches"] += 1
+                k = sum(1 for r in m["rows"] if r[2] is not None)
+                stat["multi_finish"] += k >= 2; stat["no_finish"] += k == 0
             if m["date"] >= cutoff:
                 keep.append(l if l.endswith("\n") else l + "\n"); continue
             g = arch.setdefault(m["season"], {"ids": [], "runs": {c: [] for c in COLS}})
             g["ids"].append(m["id"])
-            for nick, uuid, fin, *sp in m["rows"]:
-                for c, v in zip(COLS, vals(m, nick, uuid, fin, sp)): g["runs"][c].append(v)
+            for row in m["rows"]:
+                for c, v in zip(COLS, vals(m, row)): g["runs"][c].append(v)
         for sn, g in arch.items():  # 追記のみ(数値だけ・ID は差分符号化)
             ids = sorted(g["ids"]); delta = [ids[0]] + [b - a for a, b in zip(ids, ids[1:])]
             with (A / f"s{sn}.jsonl").open("a", encoding="utf-8") as f:
@@ -156,22 +186,25 @@ def build(days):
     for p in sorted(A.glob("s*.jsonl")):
         for l in p.open(encoding="utf-8"):
             runs = json.loads(l)["runs"]; k = len(runs["finish"])
-            for c in COLS: R[c].extend(runs.get(c, [-1] * k))  # 旧形式の archive は走者番号なし(-1)
+            for c in COLS: R[c].extend(runs.get(c, [DEFAULT.get(c)] * k))  # 旧形式の archive は欠けた列を既定値で補う
     for l in keep:
         m = json.loads(l)
-        for nick, uuid, fin, *sp in m["rows"]:
-            for c, v in zip(COLS, vals(m, nick, uuid, fin, sp)): R[c].append(v)
+        for row in m["rows"]:
+            for c, v in zip(COLS, vals(m, row)): R[c].append(v)
     ordered = sorted(runners.items(), key=lambda kv: kv[1][0])
     RUNNERS.write_text(json.dumps([[r[1], u, r[2]] for u, r in ordered], ensure_ascii=False), encoding="utf-8")
-    (D / "finishers.json").write_text(json.dumps({"schema_version": 5, "runners": [[r[1], u] for u, r in ordered], "runs": R}, ensure_ascii=False))
-    (D / "meta.json").write_text(json.dumps({"schema_version": 5, "runs": len(R["finish"]),
+    (D / "finishers.json").write_text(json.dumps({"schema_version": 6, "runners": [[r[1], u] for u, r in ordered], "runs": R}, ensure_ascii=False))
+    fin = sum(v is not None for v in R["finish"])
+    (D / "meta.json").write_text(json.dumps({"schema_version": 6, "runs": len(R["finish"]), "finishers": fin,
         "record_ms": record(), "snapshot_date": datetime.date.today().isoformat()}))
     bys = {}
     for sn in R["season"]: bys[sn] = bys.get(sn, 0) + 1
-    print(f"{len(R['finish'])} 完走 / 走者 {len(runners)} 人 / シーズン別:", dict(sorted(bys.items())),
+    print(f"{len(R['finish'])} 走り(うち完走 {fin}) / 走者 {len(runners)} 人 / シーズン別:", dict(sorted(bys.items())),
+          "/ 全員分を記録した走り:", sum(R["full"]),
           "/ 区間ごとの取得数:", {k: sum(v is not None for v in R[k]) for k in KEYS},
           "/ スタート形態:", {o: R["start"].count(i) for i, o in enumerate(OW)},
-          "/ バスチオン:", {o: R["bastion_type"].count(i) for i, o in enumerate(BT)})
+          "/ バスチオン:", {o: R["bastion_type"].count(i) for i, o in enumerate(BT)},
+          "/ 直近の試合: 完走者2人以上", stat["multi_finish"], "・完走者0人", stat["no_finish"], "・全", stat["matches"])
 
 if __name__ == "__main__":
     ap = argparse.ArgumentParser()
