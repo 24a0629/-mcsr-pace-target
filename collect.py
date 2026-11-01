@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """MCSR Ranked のランク戦のデータを集めて蓄積する(標準ライブラリのみ・管理者権限不要)。
   python collect.py fetch [--minutes 25]   # 何度でも再実行OK(続きから再開)
+  python collect.py probe                  # APIの応答の形を確かめる(2リクエスト)
   python collect.py build [--days 14]      # 古い試合を数値だけ(走者は番号)の archive に移し、finishers.json / meta.json を生成
 収集の優先順: ①最新の試合(既知の範囲まで) → ②古い試合を新しい順に遡る(シーズンをまたいで続きから再開)
 保存するのは、完走した人だけでなく、その試合の「全員」(完走しなかった人の区間タイムと、試合の終了時刻を含む)。"""
@@ -22,9 +23,10 @@ BT = ["BRIDGE", "HOUSING", "STABLES", "TREASURE"]                               
 # archive / finishers.json の列(1行 = 1人の1回の走り)
 #   finish: 完走タイム(完走しなかった人は None)  mend: その試合が終わった時刻(ms)。区間の "end" とは別の列
 #   elo: 試合前のElo(推定)  elo_pl: 試合データの players にあるElo(そのまま)  full: 1=全員分を記録した試合
+#   ff: 途中棄権の試合なら1  win: 勝者なら1(不明は None。途中棄権の試合では、勝者でない側が棄権した人)
 #   bg: ビギナー戦  bot: bot由来
 COLS = ["runner_idx", "season", "time", "start", "bastion_type", "finish", "mend", "elo", "elo_pl",
-        "full", "bg", "bot", *KEYS]
+        "full", "ff", "win", "bg", "bot", *KEYS]
 DEFAULT = {"full": 0}  # 旧形式の archive で欠けている列の既定値(それ以外は None)
 
 def get(path):
@@ -94,6 +96,7 @@ def fetch(minutes):
         rec = {"v": 2, "id": m["id"], "date": m["date"], "season": m["season"]}
         if d is not None:
             rec.update(ow=start_of(d), bt=bastion_of(d), end=(d.get("result") or {}).get("time"),
+                       wu=(d.get("result") or {}).get("uuid"),
                        ff=bool(d.get("forfeited")), bg=int(bool(d.get("beginner"))),
                        bot=int(d.get("botSource") is not None), rows=rows(d))
         else:
@@ -137,6 +140,23 @@ def fetch(minutes):
         STATE.write_text(json.dumps(st))
     print(f"{n[0]} 試合を追加(累計 {len(seen)}) / 遡り位置: {st.get('back')}")
 
+def probe():
+    """APIの応答の形を確かめる(2リクエストだけ)。結果はそのまま貼って共有できる(UUIDは先頭6文字だけ)。"""
+    sh = lambda u: (u or "")[:6]
+    lst = get("/matches?type=2&count=20")
+    print(f"[probe] 一覧: {len(lst)}件 / 先頭のキー: {sorted(lst[0].keys())}")
+    f = sum(1 for m in lst if m.get("forfeited"))
+    print(f"[probe] 一覧の途中棄権: {f}/{len(lst)} / 先頭の result: {lst[0].get('result') and {**lst[0]['result'], 'uuid': sh(lst[0]['result'].get('uuid'))}} / seedType: {lst[0].get('seedType')} / bastionType: {lst[0].get('bastionType')} / seed: {lst[0].get('seed')}")
+    print(f"[probe] 一覧のplayers[0]のキー: {sorted(lst[0]['players'][0].keys())} / Elo: {[p.get('eloRate') for p in lst[0]['players']]} / changes: {[(sh(c['uuid']), c.get('change'), c.get('eloRate')) for c in lst[0].get('changes', [])]}")
+    m = next((x for x in lst if not x.get("forfeited")), lst[0])
+    d = get(f"/matches/{m['id']}")
+    print(f"[probe] 詳細(id={d['id']}): season={d['season']} date={d['date']} result={d['result'] and {**d['result'], 'uuid': sh(d['result'].get('uuid'))}} forfeited={d['forfeited']} beginner={d.get('beginner')} botSource={d.get('botSource')} gameMode={d.get('gameMode')} category={d.get('category')} tag={d.get('tag')}")
+    print(f"[probe] 詳細: players={len(d['players'])} 完走者={len(d.get('completions') or [])} timelines={len(d.get('timelines') or [])} seed={d.get('seed')} seedType={d.get('seedType')} bastionType={d.get('bastionType')}")
+    print(f"[probe] 詳細: players Elo={[(sh(p['uuid']), p.get('eloRate')) for p in d['players']]} / changes={[(sh(c['uuid']), c.get('change'), c.get('eloRate')) for c in d.get('changes', [])]}")
+    kinds = {}
+    for t in d.get("timelines") or []: kinds.setdefault(sh(t["uuid"]), []).append(t["type"])
+    print("[probe] 詳細: 走者ごとのイベント数:", {u: len(v) for u, v in kinds.items()}, "/ 種類:", sorted({t for v in kinds.values() for t in v}))
+
 def record():
     try: return min(e["time"] for e in get("/record-leaderboard"))
     except Exception as e: print("最速タイムの取得に失敗:", e); return None
@@ -157,21 +177,25 @@ def build(days):
         if m.get("v", 1) >= 2:
             nick, uuid, fin, pre, pl, *sp = row
             elo = pre if pre is not None else pl
-            tail = [m.get("end"), elo, pl, 1, m.get("bg", 0), m.get("bot", 0)]
+            wu, ff = m.get("wu"), int(bool(m.get("ff")))
+            if wu: win = int(uuid == wu)
+            elif not ff: win = int(fin is not None)  # 通常の決着では、勝者=完走した人
+            else: win = None                         # 途中棄権で勝者が不明(古い記録)
+            tail = [m.get("end"), elo, pl, 1, ff, win, m.get("bg", 0), m.get("bot", 0)]
         else:  # 旧形式(完走者だけ)
             nick, uuid, fin, *sp = row
-            tail = [None, None, None, 0, 0, 0]
+            tail = [None, None, None, 0, None, None, 0, 0]
         return [rid(runners, uuid, nick, m["date"]), m["season"], m["date"], m["ow"], m.get("bt", -1), fin, *tail, *sp]
 
     keep, arch, R = [], {}, {c: [] for c in COLS}
-    stat = {"matches": 0, "multi_finish": 0, "no_finish": 0}
+    stat = {"matches": 0, "multi_finish": 0, "no_finish": 0, "ff": 0}
     if RECENT.exists():
         for l in RECENT.open(encoding="utf-8"):
             m = json.loads(l)
             if m["rows"]:
                 stat["matches"] += 1
                 k = sum(1 for r in m["rows"] if r[2] is not None)
-                stat["multi_finish"] += k >= 2; stat["no_finish"] += k == 0
+                stat["multi_finish"] += k >= 2; stat["no_finish"] += k == 0; stat["ff"] += bool(m.get("ff"))
             if m["date"] >= cutoff:
                 keep.append(l if l.endswith("\n") else l + "\n"); continue
             g = arch.setdefault(m["season"], {"ids": [], "runs": {c: [] for c in COLS}})
@@ -204,12 +228,12 @@ def build(days):
           "/ 区間ごとの取得数:", {k: sum(v is not None for v in R[k]) for k in KEYS},
           "/ スタート形態:", {o: R["start"].count(i) for i, o in enumerate(OW)},
           "/ バスチオン:", {o: R["bastion_type"].count(i) for i, o in enumerate(BT)},
-          "/ 直近の試合: 完走者2人以上", stat["multi_finish"], "・完走者0人", stat["no_finish"], "・全", stat["matches"])
+          "/ 直近の試合: 完走者2人以上", stat["multi_finish"], "・完走者0人", stat["no_finish"], "(うち途中棄権", stat["ff"], ")・全", stat["matches"])
 
 if __name__ == "__main__":
     ap = argparse.ArgumentParser()
-    ap.add_argument("cmd", choices=["fetch", "build"])
+    ap.add_argument("cmd", choices=["fetch", "build", "probe"])
     ap.add_argument("--minutes", type=float, default=25)
     ap.add_argument("--days", type=int, default=14)
     a = ap.parse_args()
-    fetch(a.minutes) if a.cmd == "fetch" else build(a.days)
+    {"fetch": lambda: fetch(a.minutes), "build": lambda: build(a.days), "probe": probe}[a.cmd]()
