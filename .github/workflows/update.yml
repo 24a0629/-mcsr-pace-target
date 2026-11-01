@@ -18,6 +18,8 @@ jobs:
         with: {ref: data, path: data}
       - uses: actions/setup-python@v5
         with: {python-version: "3.12"}
+      - run: python collect.py probe
+        continue-on-error: true
       - run: python collect.py fetch --minutes 40 && python collect.py build --days 14
       - name: save data branch (1コミットに上書き=履歴が増えない)
         env: {GH_TOKEN: "${{ secrets.GITHUB_TOKEN }}"}
