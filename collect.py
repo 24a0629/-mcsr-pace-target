@@ -22,11 +22,14 @@ OW = ["BURIED_TREASURE", "SHIPWRECK", "VILLAGE", "RUINED_PORTAL", "DESERT_TEMPLE
 BT = ["BRIDGE", "HOUSING", "STABLES", "TREASURE"]                                  # index.html と対応
 # archive / finishers.json の列(1行 = 1人の1回の走り)
 #   finish: 完走タイム(完走しなかった人は None)  mend: その試合が終わった時刻(ms)。区間の "end" とは別の列
-#   elo: 試合前のElo(推定)  elo_pl: 試合データの players にあるElo(そのまま)  full: 1=全員分を記録した試合
+#   elo: 試合前のElo(changes の eloRate)  elo_pl: 試合後のElo(players の eloRate)  rs: その試合での、その人のリセット回数
+#   full: 1=全員分を記録した試合
 #   ff: 途中棄権の試合なら1  win: 勝者なら1(不明は None。途中棄権の試合では、勝者でない側が棄権した人)
 #   bg: ビギナー戦  bot: bot由来
-COLS = ["runner_idx", "season", "time", "start", "bastion_type", "finish", "mend", "elo", "elo_pl",
+COLS = ["runner_idx", "season", "time", "start", "bastion_type", "finish", "mend", "elo", "elo_pl", "rs",
         "full", "ff", "win", "bg", "bot", *KEYS]
+VER = 3  # これより古い形式の記録は、リセットの扱いとEloの意味が違うため使わない(再取得される)
+RESET = "projectelo.timeline.reset"
 DEFAULT = {"full": 0}  # 旧形式の archive で欠けている列の既定値(それ以外は None)
 
 def get(path):
@@ -48,20 +51,22 @@ def get(path):
     raise RuntimeError("API error: " + path)
 
 def rows(m):
-    """試合の全員分。[ニックネーム, UUID, 完走タイム|None, 試合前Elo(推定)|None, playersのElo|None, 区間8つ]"""
+    """試合の全員分。[ニックネーム, UUID, 完走タイム|None, 試合前Elo|None, 試合後Elo|None, リセット回数, 区間8つ]
+    リセットがあった人は、最後のリセット以降のイベントだけを区間として使う(それ以前は別の試走のため)。"""
     comp = {c["uuid"]: c["time"] for c in m.get("completions") or []}
     chg = {c["uuid"]: c for c in m.get("changes") or []}
     out = []
     for p in m["players"]:
         u = p["uuid"]
-        c = chg.get(u) or {}
-        # changes の eloRate は試合後の値と見て、変動を引いて試合前を出す(実データで要確認)
-        pre = c["eloRate"] - c["change"] if c.get("eloRate") is not None and c.get("change") is not None else None
+        evs = [t for t in m.get("timelines") or [] if t["uuid"] == u]
+        resets = [t["time"] for t in evs if t["type"] == RESET]
+        r0 = max(resets) if resets else 0
         first = {}
-        for t in m.get("timelines") or []:
-            if t["uuid"] == u and t["type"] in EV.values():
+        for t in evs:
+            if t["type"] in EV.values() and t["time"] >= r0:
                 first[t["type"]] = min(first.get(t["type"], t["time"]), t["time"])
-        out.append([p["nickname"], u, comp.get(u), pre, p.get("eloRate")] + [first.get(EV[k]) for k in KEYS])
+        pre = (chg.get(u) or {}).get("eloRate")  # 実データで確認済み: changes の eloRate は試合前、players の eloRate は試合後
+        out.append([p["nickname"], u, comp.get(u), pre, p.get("eloRate"), len(resets)] + [first.get(EV[k]) for k in KEYS])
     return out
 
 def _pick(d, key, alt, lst):
@@ -74,17 +79,22 @@ def bastion_of(d): return _pick(d, "nether", "bastionType", BT)
 def load_seen():
     seen = set()
     if RECENT.exists():
-        for l in RECENT.open(encoding="utf-8"): seen.add(json.loads(l)["id"])
+        for l in RECENT.open(encoding="utf-8"):
+            m = json.loads(l)
+            if m.get("v", 1) >= VER: seen.add(m["id"])
     for p in A.glob("s*.jsonl"):
         for l in p.open(encoding="utf-8"):
+            a = json.loads(l)
+            if "rs" not in a["runs"]: continue  # 旧形式
             x = 0
-            for d in json.loads(l)["ids"]: x += d; seen.add(x)
+            for d in a["ids"]: x += d; seen.add(x)
     return seen
 
 def fetch(minutes):
     end = time.time() + minutes * 60
     seen = load_seen()
     st = json.loads(STATE.read_text()) if STATE.exists() else {}
+    if st.get("ver") != VER: st = {"ver": VER}  # 形式が変わったら、遡り位置も最初からやり直す
     n, info = [0], {}
 
     def put(f, m):  # m: 一覧の1件(MatchInfo)
@@ -93,7 +103,7 @@ def fetch(minutes):
         if not skip:
             try: d = get(f"/matches/{m['id']}")
             except urllib.error.HTTPError as e: print("skip", m["id"], e.code); skip = True
-        rec = {"v": 2, "id": m["id"], "date": m["date"], "season": m["season"]}
+        rec = {"v": VER, "id": m["id"], "date": m["date"], "season": m["season"]}
         if d is not None:
             rec.update(ow=start_of(d), bt=bastion_of(d), end=(d.get("result") or {}).get("time"),
                        wu=(d.get("result") or {}).get("uuid"),
@@ -156,6 +166,13 @@ def probe():
     kinds = {}
     for t in d.get("timelines") or []: kinds.setdefault(sh(t["uuid"]), []).append(t["type"])
     print("[probe] 詳細: 走者ごとのイベント数:", {u: len(v) for u, v in kinds.items()}, "/ 種類:", sorted({t for v in kinds.values() for t in v}))
+    info = {}
+    for t in d.get("timelines") or []:
+        x = info.setdefault(sh(t["uuid"]), {"reset": [], "dup": {}, "seen": {}})
+        if t["type"] == RESET: x["reset"].append(t["time"])
+        x["seen"][t["type"]] = x["seen"].get(t["type"], 0) + 1
+    for u, x in info.items(): x["dup"] = {k: v for k, v in x.pop("seen").items() if v >= 2}
+    print("[probe] 詳細: リセット時刻と、同じイベントが2回以上ある種類:", info)
 
 def record():
     try: return min(e["time"] for e in get("/record-leaderboard"))
@@ -173,25 +190,22 @@ def build(days):
     if RUNNERS.exists():
         for i, (nk, u, d) in enumerate(json.loads(RUNNERS.read_text(encoding="utf-8"))): runners[u] = [i, nk, d]
 
-    def vals(m, row):  # COLS の順に並べた値
-        if m.get("v", 1) >= 2:
-            nick, uuid, fin, pre, pl, *sp = row
-            elo = pre if pre is not None else pl
-            wu, ff = m.get("wu"), int(bool(m.get("ff")))
-            if wu: win = int(uuid == wu)
-            elif not ff: win = int(fin is not None)  # 通常の決着では、勝者=完走した人
-            else: win = None                         # 途中棄権で勝者が不明(古い記録)
-            tail = [m.get("end"), elo, pl, 1, ff, win, m.get("bg", 0), m.get("bot", 0)]
-        else:  # 旧形式(完走者だけ)
-            nick, uuid, fin, *sp = row
-            tail = [None, None, None, 0, None, None, 0, 0]
-        return [rid(runners, uuid, nick, m["date"]), m["season"], m["date"], m["ow"], m.get("bt", -1), fin, *tail, *sp]
+    def vals(m, row):  # COLS の順に並べた値(m は VER 以上の記録だけ)
+        nick, uuid, fin, pre, pl, rs, *sp = row
+        wu, ff = m.get("wu"), int(bool(m.get("ff")))
+        if wu: win = int(uuid == wu)
+        elif not ff: win = int(fin is not None)  # 通常の決着では、勝者=完走した人
+        else: win = None
+        return [rid(runners, uuid, nick, m["date"]), m["season"], m["date"], m["ow"], m.get("bt", -1), fin,
+                m.get("end"), pre, pl, rs, 1, ff, win, m.get("bg", 0), m.get("bot", 0), *sp]
 
     keep, arch, R = [], {}, {c: [] for c in COLS}
-    stat = {"matches": 0, "multi_finish": 0, "no_finish": 0, "ff": 0}
+    stat = {"matches": 0, "multi_finish": 0, "no_finish": 0, "ff": 0, "old": 0}
     if RECENT.exists():
         for l in RECENT.open(encoding="utf-8"):
             m = json.loads(l)
+            if m.get("v", 1) < VER:
+                stat["old"] += 1; continue  # 旧形式は捨てる(再取得される)
             if m["rows"]:
                 stat["matches"] += 1
                 k = sum(1 for r in m["rows"] if r[2] is not None)
@@ -210,6 +224,7 @@ def build(days):
     for p in sorted(A.glob("s*.jsonl")):
         for l in p.open(encoding="utf-8"):
             runs = json.loads(l)["runs"]; k = len(runs["finish"])
+            if "rs" not in runs: continue  # 旧形式の archive は使わない
             for c in COLS: R[c].extend(runs.get(c, [DEFAULT.get(c)] * k))  # 旧形式の archive は欠けた列を既定値で補う
     for l in keep:
         m = json.loads(l)
@@ -228,7 +243,7 @@ def build(days):
           "/ 区間ごとの取得数:", {k: sum(v is not None for v in R[k]) for k in KEYS},
           "/ スタート形態:", {o: R["start"].count(i) for i, o in enumerate(OW)},
           "/ バスチオン:", {o: R["bastion_type"].count(i) for i, o in enumerate(BT)},
-          "/ 直近の試合: 完走者2人以上", stat["multi_finish"], "・完走者0人", stat["no_finish"], "(うち途中棄権", stat["ff"], ")・全", stat["matches"])
+          "/ 直近の試合: 完走者2人以上", stat["multi_finish"], "・完走者0人", stat["no_finish"], "(うち途中棄権", stat["ff"], ")・全", stat["matches"], "/ 旧形式で捨てた試合", stat["old"])
 
 if __name__ == "__main__":
     ap = argparse.ArgumentParser()
