@@ -50,11 +50,12 @@ a{color:var(--accent-bright);text-decoration:none}a:hover{text-decoration:underl
 .hdr-r{display:flex;align-items:center;gap:10px}.set-link{color:var(--muted);font-size:12px;font-weight:500;padding:5px 11px;border:1px solid var(--border);border-radius:6px;background:var(--surface)}.set-link:hover{color:var(--text);text-decoration:none}
 html[data-mode=ranked] .m-rsg,html[data-mode=rsg] .m-ranked{display:none!important}
 .set h3{margin:26px 0 8px;font-size:13px;font-weight:600}.set h3:first-child{margin-top:0}.set .dsc{margin-top:6px}.lvrow{display:flex;gap:18px;flex-wrap:wrap;align-items:center;color:var(--muted);font-size:13px}.set input[type=text]{width:64px;padding:5px 8px;font-size:14px}.set table.splits td,.set table.splits th{padding:8px 10px}.set textarea{width:100%;min-height:90px;background:var(--surface-2);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:8px;font:12px ui-monospace,monospace}.set textarea.bad{border-color:var(--warn)}.btnrow{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}.chk{display:flex;gap:8px;align-items:flex-start;margin:6px 0;font-size:13px;color:var(--muted)}.chk input{margin-top:3px}.set select{width:auto;min-width:200px}
+.set-link.on{color:var(--text);background:var(--surface-3)}
 footer{text-align:center;color:var(--muted-dim);margin-top:32px;font-size:12px}
 @media(max-width:640px){.container{padding:20px 0 60px}.app-header,footer{padding-left:16px;padding-right:16px}.app-header{margin-bottom:16px}.card{border-left:0;border-right:0;border-radius:0;margin-bottom:0}.card+.card{margin-top:12px}.card>h2{padding:14px 16px}.body{padding:16px}.help-content{padding:14px 16px}.controls,.controls.filters,.controls.search{grid-template-columns:1fr;gap:16px}.user-stats{grid-template-columns:1fr 1fr;gap:8px}table.splits th,table.splits td{padding:10px 8px}}
 </style></head><body>
 <div class="container">
-<header class="app-header"><h1><span class="dot"></span>MCSR Ranked Pace Target</h1><div class="hdr-r"><a class="set-link" href="#settings"><span lang="en">Settings</span><span lang="ja">設定</span></a><div class="lang-toggle" id="sw"><button type="button" data-l="ja">日本語</button><button type="button" data-l="en" class="active">English</button></div></div></header>
+<header class="app-header"><h1><span class="dot"></span>MCSR Ranked Pace Target</h1><div class="hdr-r"><a class="set-link" id="setLink" href="#settings"><span lang="en">Settings</span><span lang="ja">設定</span></a><div class="lang-toggle" id="sw"><button type="button" data-l="ja">日本語</button><button type="button" data-l="en" class="active">English</button></div></div></header>
 <div id="mainv">
 <div id="ld" class="notice" hidden><span lang="en">No data found (data/finishers.json). Load a JSON built by collect.py, or preview the UI with demo data.</span><span lang="ja">データ(data/finishers.json)が見つかりません。collect.py で作ったJSONを読み込むか、デモデータでUIを確認できます。</span><div class="row" style="margin-top:8px"><input type="file" id="fi"><button class="secondary" id="dmb" type="button">Show demo data</button></div></div>
 <div id="dm" class="notice" hidden></div>
@@ -85,6 +86,10 @@ footer{text-align:center;color:var(--muted-dim);margin-top:32px;font-size:12px}
 <h3 id="sRT"></h3><div class="dsc" style="margin:0 0 8px"><span lang="en">A split’s line appears at the first time the chance of hitting the target drops below its percentage. Edit the Custom column; copy a preset as a starting point.</span><span lang="ja">達成確率がこの%を下回る最初の時間が、その区間の線になる。「Custom」列を編集する。プリセットをコピーして出発点にできる。</span></div>
 <div style="overflow-x:auto"><table class="splits"><thead><tr><th>split</th><th><span lang="en">Aggressive</span><span lang="ja">攻め</span></th><th><span lang="en">Balanced</span><span lang="ja">標準</span></th><th><span lang="en">Persistent</span><span lang="ja">粘り</span></th><th style="color:var(--accent-bright)">Custom</th></tr></thead><tbody id="sTb"></tbody></table></div>
 <div class="btnrow"><button class="secondary" type="button" data-c="aggressive"><span lang="en">Copy Aggressive</span><span lang="ja">攻めをコピー</span></button><button class="secondary" type="button" data-c="balanced"><span lang="en">Copy Balanced</span><span lang="ja">標準をコピー</span></button><button class="secondary" type="button" data-c="persistent"><span lang="en">Copy Persistent</span><span lang="ja">粘りをコピー</span></button></div>
+<h3><span lang="en">Bias correction</span><span lang="ja">偏りの補正</span></h3>
+<label class="chk"><input type="checkbox" id="tCorr"><span><span lang="en">Use runs that did not finish (recommended). In Ranked a match ends when the opponent finishes, so finisher-only numbers are optimistic; this corrects for the cut-off runs (Kaplan–Meier).</span><span lang="ja">完走しなかった人も使う(おすすめ)。Rankedでは相手が完走すると試合が終わるため、完走者だけだと楽観的になる。打ち切られた走りを統計手法(カプラン・マイヤー法)で補正する。</span></span></label>
+<label class="chk"><input type="checkbox" id="tFF"><span><span lang="en">Count forfeits as failures. Off (default): a player who forfeits is treated like a cut-off run. On: the forfeiting player is assumed never to finish. Forfeits often follow a death and can be a speed-first gamble, so this is not always a failure.</span><span lang="ja">棄権を失敗として数える。オフ(初期値): 棄権した人も、打ち切られた走りと同じ扱い。オン: 棄権した人は完走しなかったものとして数える。棄権は死亡後に勝利を断念して行うことが多く、速度重視の結果でもあるため、必ずしも失敗とは言えない。</span></span></label>
+<div class="dsc" id="sCorrNote"></div>
 <h3><span lang="en">Tidy display</span><span lang="ja">表示の整え方</span></h3>
 <label class="chk"><input type="checkbox" id="tCap"><span><span lang="en">Show “none” instead of the cap value when the chance never drops below the threshold (recommended).</span><span lang="ja">確率が閾値を下回らないとき、上限の値ではなく「なし」と表示する(おすすめ)。</span></span></label>
 <label class="chk"><input type="checkbox" id="tMono"><span><span lang="en">Keep each column increasing down the table (a later split is never earlier than the previous one). Can hide noise.</span><span lang="ja">各列が上から下へ小さくならないようにそろえる(前の区間より早い時間にならない)。ばらつきを隠すことがある。</span></span></label>
@@ -121,9 +126,20 @@ const CAP={nether:10*M,bastion:12*M,fortress:15*M,rod:16*M,blind:18*M,stronghold
 const PS={aggressive:[.4,.3,.2,.16,.12,.06,.03,.02],balanced:[.25,.18,.12,.09,.06,.03,.02,.02],persistent:[.08,.05,.03,.025,.02,.02,.02,.02]};
 const fmt=ms=>ms==null?'—':Math.floor(ms/M)+':'+String(Math.floor(ms/1e3)%60).padStart(2,'0');
 const parse=s=>{const m=/^(\d{1,2})(?::([0-5]\d))?$/.exec(s.trim());return m?(+m[1]*60+ +(m[2]||0))*1e3:null};
-let C,N,LO=36e4,FAST=0,RN=[],RI=-1,NOW=0,LAST={},POP=null,CURS=0,WT=false,$=id=>document.getElementById(id);
-function bins(idx,k,tg,mx){const col=C[k]||[],W=C.w,u=new Map,d=new Map,n=new Map;for(const i of idx){const v=col[i];if(v==null||v>mx)continue;const b=Math.floor(v/B)*B,w=W&&W[i]!=null?W[i]:1;u.set(b,(u.get(b)||0)+w);n.set(b,(n.get(b)||0)+1);if(C.finish[i]<=tg)d.set(b,(d.get(b)||0)+w)}
+let C,N,LO=36e4,FAST=0,RN=[],RI=-1,NOW=0,LAST={},POP=null,CURS=0,WT=false,OT=null,OE=null,ORD=null,CORR=false,LASTFF=null,$=id=>document.getElementById(id);
+function binsF(idx,k,tg,mx){const col=C[k]||[],W=C.w,u=new Map,d=new Map,n=new Map;for(const i of idx){const v=col[i];if(v==null||v>mx)continue;const b=Math.floor(v/B)*B,w=W&&W[i]!=null?W[i]:1;u.set(b,(u.get(b)||0)+w);n.set(b,(n.get(b)||0)+1);if(C.finish[i]<=tg)d.set(b,(d.get(b)||0)+w)}
  return[...u.keys()].sort((a,b)=>a-b).map(b=>({lo:b,n:n.get(b),p:(d.get(b)||0)/u.get(b)}))}
+// 完走しなかった人も使う版: 打ち切り(相手の完走で試合が終わった)を、カプラン・マイヤー法で補正する
+function binsKM(k,tg,mx){const col=C[k]||[],W=C.w,g=new Map();
+ for(let q=0;q<ORD.length;q++){const i=ORD[q];if(!POP[i])continue;const v=col[i];if(v==null||v>mx)continue;const b=Math.floor(v/B)*B;let a=g.get(b);if(!a){a=[];g.set(b,a)}a.push(i)}
+ return[...g.keys()].sort((x,y)=>x-y).map(b=>{const a=g.get(b);let n=0,S=1;for(const i of a)n+=W&&W[i]!=null?W[i]:1;
+  for(const i of a){if(OT[i]>tg||n<=0)break;const w=W&&W[i]!=null?W[i]:1;if(OE[i])S*=Math.max(0,1-w/n);n-=w}
+  return{lo:b,n:a.length,p:1-S}})}
+function bins(idx,k,tg,mx){return CORR&&ORD?binsKM(k,tg,mx):binsF(idx,k,tg,mx)}
+// 走りごとの「結果の時刻」。完走した人=完走タイム(結果あり) / 打ち切られた人=試合が終わった時刻(結果なし) / 棄権を失敗とする設定のとき、棄権した人=いつまでも完走しない
+function prep(){LASTFF=SET.ffFail;if(!(C.full&&C.mend)){OT=OE=ORD=null;return}OT=new Float64Array(N);OE=new Uint8Array(N);
+ for(let i=0;i<N;i++){const f=C.finish[i];if(f!=null){OT[i]=f;OE[i]=1}else OT[i]=(SET.ffFail&&C.ff&&C.ff[i]===1&&C.win&&C.win[i]===0)?Infinity:(C.mend[i]!=null?C.mend[i]:0)}
+ ORD=Uint32Array.from({length:N},(_,i)=>i).sort((a,b)=>OT[a]-OT[b]||OE[b]-OE[a])}
 function thr(bs,rp){if(!bs.length)return{};let a=-1,o=-1;bs.forEach((b,i)=>{if(b.n>=R5&&b.p>o){o=b.p;a=i}});
  if(a<0){a=0;o=bs[0].p;bs.forEach((b,i)=>{if(b.p>o){o=b.p;a=i}})}
  const s=bs.map(b=>b.p);let c=s[a];for(let i=a+1;i<bs.length;i++){if(bs[i].n>=R5){c=Math.min(c,s[i]);s[i]=c}else s[i]=Math.min(s[i],c)}
@@ -132,15 +148,15 @@ function thr(bs,rp){if(!bs.length)return{};let a=-1,o=-1;bs.forEach((b,i)=>{if(b
  return{c:lv(LV[0]),s:lv(LV[1]),t:lv(LV[2]),r:rs()}}
 const cell=(x,c)=>`<td><span class="${c}${x&&x.lo?' low-sample':''}">${x?fmt(x.ms):'—'}</span></td>`;
 const sub=k=>`<td class="split-name">${NM[k]}<div class="sub">${ID[k]}</div></td>`;
-function route(i,r){if(r==='all')return true;const b=C.bastion[i],f=C.fortress[i];if(b==null||f==null)return false;return r==='bastion'?b<f:f<b}
+function route(i,r){if(r==='all')return true;const b=C.bastion[i],f=C.fortress[i];let first=null;if(b!=null&&(f==null||b<f))first='bastion';else if(f!=null)first='fortress';return first===r}
 const L=()=>document.documentElement.lang,T=(en,ja)=>L()==='ja'?ja:en;
 let ROWS=[],META=null,DEMO=false;
 const SH={nether:'nether',bastion:'bastion',fortress:'fort.',rod:'rod',blind:'blind',stronghold:'SH',end:'end',dragon:'dragon'};
 const PRL={custom:['Custom','カスタム',''],aggressive:['Aggressive','攻め','40/30/20/16/12/6/3/2'],balanced:['Balanced','標準','25/18/12/9/6/3/2/2'],persistent:['Persistent','粘り','8/5/3/2.5/2/2/2/2']};
 const PDS={aggressive:['Reset hard on slow early splits. Fewer finishes, but fast ones.','序盤の遅れはすぐ切る。完走数は減るが、速い走りが残る。'],balanced:['In between: cut clear early delays, commit late to bank the finish.','攻めと粘りの中間。序盤の明らかな遅れは切り、終盤は完走に振る。'],persistent:['Chase finish count: push on until the target is nearly impossible.','完走を積みたい人向け。可能性がほぼ無くなるまで走り切る。'],custom:['Your own thresholds (edit in Settings).','自分で決めた基準(設定で編集)。']};
 const PDR={aggressive:['Strict: flags “out of reach” early, while a fair chance remains.','厳しめ。まだ見込みが残るうちから「届かない」と判定する。'],balanced:['In between: flags clear early delays, stays lenient late.','中間。序盤の明らかな遅れは指摘し、終盤は緩め。'],persistent:['Lenient: flags “out of reach” only when the chance is almost gone.','緩め。見込みがほぼ無くなってから「届かない」と判定する。'],custom:PDS.custom};
-const SD={mode:'ranked',lv:[.8,.5,.2],custom:[.25,.18,.12,.09,.06,.03,.02,.02],tidyCap:false,tidyMono:false};
-function normSet(o){const s=JSON.parse(JSON.stringify(SD));if(o&&typeof o==='object'){if(o.mode==='rsg')s.mode='rsg';if(Array.isArray(o.lv)&&o.lv.length===3&&o.lv.every(v=>typeof v==='number'&&v>0&&v<1)&&o.lv[0]>o.lv[1]&&o.lv[1]>o.lv[2])s.lv=o.lv;if(Array.isArray(o.custom)&&o.custom.length===8&&o.custom.every(v=>typeof v==='number'&&v>=0&&v<=1))s.custom=o.custom;s.tidyCap=!!o.tidyCap;s.tidyMono=!!o.tidyMono}return s}
+const SD={mode:'ranked',lv:[.8,.5,.2],custom:[.25,.18,.12,.09,.06,.03,.02,.02],tidyCap:false,tidyMono:false,corr:true,ffFail:false};
+function normSet(o){const s=JSON.parse(JSON.stringify(SD));if(o&&typeof o==='object'){if(o.mode==='rsg')s.mode='rsg';if(Array.isArray(o.lv)&&o.lv.length===3&&o.lv.every(v=>typeof v==='number'&&v>0&&v<1)&&o.lv[0]>o.lv[1]&&o.lv[1]>o.lv[2])s.lv=o.lv;if(Array.isArray(o.custom)&&o.custom.length===8&&o.custom.every(v=>typeof v==='number'&&v>=0&&v<=1))s.custom=o.custom;s.tidyCap=!!o.tidyCap;s.tidyMono=!!o.tidyMono;s.corr=o.corr!==false;s.ffFail=!!o.ffFail}return s}
 let SET=normSet(null),LV=SET.lv;try{SET=normSet(JSON.parse(localStorage.getItem('settings')||'null'));LV=SET.lv}catch(e){}
 Object.defineProperty(PS,'custom',{get:()=>SET.custom});
 const MODE=()=>SET.mode,pf=v=>+(v*100).toFixed(1),pd=k=>(MODE()==='rsg'?PDS:PDR)[k][L()==='ja'?1:0];
@@ -163,9 +179,10 @@ function chart(tg){const W=700,H=270,Lm=46,Rm=12,Tm=12,Bm=30,names=['start',...K
  const lg=[['--accent-bright','Comfortable','余裕',''],['--text','Standard','標準',''],['--muted','Tight','厳しめ',''],['--warn',RTM('en'),RTM('ja'),'dashed']].map(a=>`<span class="pace-chart-legend-item" style="color:var(${a[0]})"><span class="pace-chart-legend-swatch" style="border-top:2px ${a[3]||'solid'} var(${a[0]})"></span>${T(a[1],a[2])}</span>`).join('');
  return`<div class="pace-chart-wrap"><svg class="pace-chart" viewBox="0 0 ${W} ${H}" width="100%">${g}</svg><div class="pace-chart-legend">${lg}</div></div>`}
 function draw(){const tg=+$('sl').value,r=$('rt').value,st=$('ow').value,bt=$('bt').value,se=$('se').value,pr=PS[$('ps').value],idx=[];
- for(let i=0;i<N;i++)if(C.finish[i]!=null&&route(i,r)&&(st==='all'||C.start[i]==st)&&(bt==='all'||C.bastion_type[i]==bt)&&(se==='all'||C.season[i]==se))idx.push(i);
- POP=new Uint8Array(N);idx.forEach(i=>POP[i]=1);const hit=idx.filter(i=>C.finish[i]<=tg).length,rn=r==='all'?'':r+' ';
- $('info').innerHTML=`<strong>${hit.toLocaleString()}</strong> ${T('hits / ','完走(目標以内) / ')}<strong>${idx.length.toLocaleString()}</strong> ${rn}${T('finishes','完走')} <span class="dim">(${T('target','目標')} ${fmt(tg)} · ${T('fastest','最速')} ${fmt(FAST)}${WT?' · '+T('weighted sample','重み付き標本'):''})</span>`;
+ CORR=!!(SET.corr&&C.full&&C.mend);
+ for(let i=0;i<N;i++)if((CORR?C.full[i]===1:C.finish[i]!=null)&&route(i,r)&&(st==='all'||C.start[i]==st)&&(bt==='all'||C.bastion_type[i]==bt)&&(se==='all'||C.season[i]==se))idx.push(i);
+ POP=new Uint8Array(N);idx.forEach(i=>POP[i]=1);let nf=0,hit=0;for(const i of idx){const f=C.finish[i];if(f!=null){nf++;if(f<=tg)hit++}}const rn=r==='all'?'':r+' ',tail=`${T('target','目標')} ${fmt(tg)} · ${T('fastest','最速')} ${fmt(FAST)}${CORR?' · '+T('bias-corrected','偏り補正あり'):''}${WT?' · '+T('weighted sample','重み付き標本'):''}`;
+ $('info').innerHTML=CORR?`<strong>${idx.length.toLocaleString()}</strong> ${rn}${T('runs','走り')} (<strong>${nf.toLocaleString()}</strong> ${T('finished','完走')}, <strong>${hit.toLocaleString()}</strong> ${T('hit the target','目標達成')}) <span class="dim">(${tail})</span>`:`<strong>${hit.toLocaleString()}</strong> ${T('hits / ','完走(目標以内) / ')}<strong>${idx.length.toLocaleString()}</strong> ${rn}${T('finishes','完走')} <span class="dim">(${tail})</span>`;
  $('pdesc').textContent=pd($('ps').value);
  $('rh').innerHTML=RTM()+'<div class="sub">P&lt;'+pf(pr[0])+'% → '+pf(pr[7])+'%</div>';$('hc').textContent='P≥'+pf(LV[0])+'%';$('hs').textContent='P≥'+pf(LV[1])+'%';$('ht').textContent='P≥'+pf(LV[2])+'%';
  ROWS=[];const RS=K.map((k,j)=>{const cap=Math.max(CAP[k],tg-MG[k]),bs=bins(idx,k,tg,cap),t=thr(bs,pr[j]);if(!t.r&&bs.length){if(SET.tidyCap)t.none=true;else t.r={ms:cap,lo:true}}return t});
@@ -177,7 +194,7 @@ function setT(ms){$('sl').value=ms;$('tt').value=fmt(ms);$('tt').className='';dr
 $('sl').oninput=e=>setT(+e.target.value);
 $('tt').onchange=e=>{const v=parse(e.target.value);if(v==null||v<LO||v>HI){e.target.className='bad';return}setT(v)};
 $('rt').onchange=$('ow').onchange=$('bt').onchange=$('se').onchange=$('ps').onchange=draw;
-function init(f,demo,meta){C=f.runs;N=C.finish.length;if(!C.start)C.start=new Array(N).fill(-1);if(!C.bastion_type)C.bastion_type=new Array(N).fill(-1);if(!C.season)C.season=new Array(N).fill(0);if(!C.runner_idx)C.runner_idx=new Array(N).fill(-1);if(!C.time)C.time=new Array(N).fill(0);RN=f.runners||[];RI=-1;$('cm').innerHTML='';NOW=0;for(const v of C.time)if(v>NOW)NOW=v;CURS=0;for(const v of C.season)if(v>CURS)CURS=v;WT=!!(C.w&&C.w.some(v=>v!=null&&v!==1));$('se').innerHTML='<option value="all">all</option>'+[...new Set(C.season)].filter(x=>x>0).sort((a,b)=>b-a).map(x=>`<option value="${x}">Season ${x}</option>`).join('');
+function init(f,demo,meta){C=f.runs;N=C.finish.length;if(!C.start)C.start=new Array(N).fill(-1);if(!C.bastion_type)C.bastion_type=new Array(N).fill(-1);if(!C.season)C.season=new Array(N).fill(0);if(!C.runner_idx)C.runner_idx=new Array(N).fill(-1);if(!C.time)C.time=new Array(N).fill(0);RN=f.runners||[];RI=-1;$('cm').innerHTML='';NOW=0;for(const v of C.time)if(v>NOW)NOW=v;CURS=0;for(const v of C.season)if(v>CURS)CURS=v;WT=!!(C.w&&C.w.some(v=>v!=null&&v!==1));prep();$('se').innerHTML='<option value="all">all</option>'+[...new Set(C.season)].filter(x=>x>0).sort((a,b)=>b-a).map(x=>`<option value="${x}">Season ${x}</option>`).join('');
  let mn=Infinity;for(const v of C.finish)if(v!=null&&v<mn)mn=v;if(meta&&meta.record_ms)mn=Math.min(mn,meta.record_ms);
  FAST=mn;LO=Math.floor(mn/B)*B;$('sl').min=LO;$('sl').max=Math.max(HI,LO+B);
  const s=C.finish.filter(v=>v!=null).sort((a,b)=>a-b),p25=s[Math.floor(s.length/4)];
@@ -189,7 +206,7 @@ function demoData(){let sd=7;const r=()=>(sd=sd*16807%2147483647)/2147483647,g=(
   [n,x,y,ro,bl,st,en,dr,fi].forEach((v,k)=>R[keys[k]].push(Math.round(v)));R.start.push(o);R.bastion_type.push(Math.floor(r()*4));R.season.push(9+Math.floor(r()*4));R.runner_idx.push(Math.floor(r()*300));R.time.push(17e8+Math.floor(r()*3e7))}
  return{runs:R,runners:Array.from({length:300},(_,i)=>['demo'+String(i).padStart(3,'0'),'-'])}}
 function cmp(){if(RI<0)return;const tg=+$('sl').value,pv=$('pd').value,ns=pv[0]==='s'?+pv.slice(1):0,ms=ns?CURS-ns+1:-1,lim=pv==='d30'?NOW-30*86400:0,mine=[],pop=[];
- for(let i=0;i<N;i++){if(C.finish[i]==null||C.time[i]<lim||C.season[i]<ms)continue;if(C.runner_idx[i]===RI)mine.push(i);if(POP[i]&&C.finish[i]<=tg)pop.push(i)}
+ for(let i=0;i<N;i++){if(C.finish[i]==null||C.time[i]<lim||C.season[i]<ms)continue;if(C.runner_idx[i]===RI)mine.push(i);if(POP[i]&&C.finish[i]!=null&&C.finish[i]<=tg)pop.push(i)}
  const b=$('cm');if(!mine.length){b.innerHTML=`<div class="note">${T('No finishes in this period.','この期間の完走がありません。')}</div>`;return}
  const hit=mine.filter(i=>C.finish[i]<=tg).length,med=a=>{a=a.filter(v=>v!=null).sort((x,y)=>x-y);return a.length?a[a.length>>1]:null};
  const pc=(k,m)=>{const v=pop.map(i=>C[k][i]).filter(x=>x!=null);return v.length?Math.round(100*v.filter(x=>x>m).length/v.length):null};
@@ -208,18 +225,18 @@ const XL={oya:'https://x.com/oyaniwatori',redlime:'https://x.com/RedLimeRL',oliv
 document.querySelectorAll('[data-x]').forEach(li=>{const u=XL[li.dataset.x];if(/^https:\/\/(x|twitter)\.com\//.test(u||''))li.innerHTML=`<a href="${u}" target="_blank" rel="noopener noreferrer">X</a>`;else li.remove()});
 function renderSet(){$('sMode').value=SET.mode;$('sModeNote').textContent=SET.mode==='rsg'?T('Probabilities still come from MCSR Ranked matches (set seeds, no resets), so treat them as an approximation for RSG. The last column is called “Reset”.','確率はMCSR Rankedの試合(同じシード・リセットなし)から計算しているため、RSGでは近似として使ってください。最後の列は「リセット」と表示します。'):T('Set-seed races where a world reset keeps the timer running. Resets here are mostly caused by your state (an unrecoverable death or mistake), not by time, so the last column is called “Out of reach”.','同じシードの競争で、ワールドをリセットしてもタイマーは進みます。リセットは、時間ではなく、取り返しのつかない死亡やミスなど自分の状態で行うことが多いため、最後の列は「目標に届かない」と表示します。');
  $('sRT').textContent=T('Thresholds for the last column (“','最後の列(「')+RTM()+T('”)','」)の基準');
- SET.lv.forEach((v,i)=>{$('lv'+i).value=pf(v);$('lv'+i).className=''});$('tCap').checked=SET.tidyCap;$('tMono').checked=SET.tidyMono;
+ SET.lv.forEach((v,i)=>{$('lv'+i).value=pf(v);$('lv'+i).className=''});$('tCap').checked=SET.tidyCap;$('tMono').checked=SET.tidyMono;$('tCorr').checked=SET.corr;$('tFF').checked=SET.ffFail;$('tFF').disabled=!SET.corr;$('sCorrNote').textContent=(C&&!(C.full&&C.mend))?T('This data has no non-finisher information, so finisher-only numbers are used.','このデータには完走しなかった人の情報がないため、完走者だけで計算します。'):'';
  $('sTb').innerHTML=K.map((k,j)=>`<tr>${sub(k)}<td>${pf(PS.aggressive[j])}%</td><td>${pf(PS.balanced[j])}%</td><td>${pf(PS.persistent[j])}%</td><td><input type="text" class="cin" data-j="${j}" value="${pf(SET.custom[j])}"> %</td></tr>`).join('');
  document.querySelectorAll('.cin').forEach(inp=>inp.onchange=()=>{const x=parseFloat(inp.value)/100;if(x>=0&&x<=1){SET.custom[+inp.dataset.j]=x;inp.className='';applySet()}else inp.className='bad'})}
-function applySet(){try{localStorage.setItem('settings',JSON.stringify(SET))}catch(e){}LV=SET.lv;applyLang();if(C)draw()}
+function applySet(){try{localStorage.setItem('settings',JSON.stringify(SET))}catch(e){}LV=SET.lv;applyLang();if(C){if(SET.ffFail!==LASTFF)prep();draw()}}
 $('sMode').onchange=e=>{SET.mode=e.target.value==='rsg'?'rsg':'ranked';applySet();renderSet()};
 ['lv0','lv1','lv2'].forEach(id=>$(id).onchange=()=>{const v=['lv0','lv1','lv2'].map(x=>parseFloat($(x).value)/100),ok=v.every(x=>x>0&&x<1)&&v[0]>v[1]&&v[1]>v[2];['lv0','lv1','lv2'].forEach(x=>$(x).className=ok?'':'bad');if(ok){SET.lv=v;applySet()}});
 document.querySelectorAll('[data-c]').forEach(b=>b.onclick=()=>{SET.custom=PS[b.dataset.c].slice();applySet();renderSet()});
-$('tCap').onchange=e=>{SET.tidyCap=e.target.checked;applySet()};$('tMono').onchange=e=>{SET.tidyMono=e.target.checked;applySet()};
+$('tCorr').onchange=e=>{SET.corr=e.target.checked;applySet();renderSet()};$('tFF').onchange=e=>{SET.ffFail=e.target.checked;applySet()};$('tCap').onchange=e=>{SET.tidyCap=e.target.checked;applySet()};$('tMono').onchange=e=>{SET.tidyMono=e.target.checked;applySet()};
 $('sExp').onclick=()=>{$('sJson').value=JSON.stringify(SET,null,1);$('sJson').className=''};
 $('sImp').onclick=()=>{try{SET=normSet(JSON.parse($('sJson').value));$('sJson').className='';applySet();renderSet()}catch(e){$('sJson').className='bad'}};
 $('sDef').onclick=()=>{SET=normSet(null);applySet();renderSet()};
-function view(){const hs=location.hash,th=hs==='#thanks',se=hs==='#settings';$('mainv').hidden=th||se;$('thanksv').hidden=!th;$('settingsv').hidden=!se;if(th||se)scrollTo(0,0)}
+function view(){const hs=location.hash,th=hs==='#thanks',se=hs==='#settings';$('mainv').hidden=th||se;$('thanksv').hidden=!th;$('settingsv').hidden=!se;if(th||se)scrollTo(0,0);const sl=$('setLink');sl.setAttribute('href',se?'#main':'#settings');sl.classList.toggle('on',se)}
 addEventListener('hashchange',view);view();
 {let l0='en';try{l0=localStorage.getItem('lang')||'en'}catch(e){}document.documentElement.lang=l0==='ja'?'ja':'en';applyLang()}
 renderSet();
