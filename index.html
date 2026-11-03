@@ -134,14 +134,14 @@ const PS={aggressive:[.4,.3,.2,.16,.12,.06,.03,.02],balanced:[.25,.18,.12,.09,.0
 const fmt=ms=>ms==null?'—':Math.floor(ms/M)+':'+String(Math.floor(ms/1e3)%60).padStart(2,'0');
 const parse=s=>{const m=/^(\d{1,2})(?::([0-5]\d))?$/.exec(s.trim());return m?(+m[1]*60+ +(m[2]||0))*1e3:null};
 let C,N,LO=36e4,FAST=0,RN=[],RI=-1,NOW=0,LAST={},POP=null,CURS=0,WT=false,BE=false,OT=null,OE=null,ORD=null,CORR=false,LASTFF=null,$=id=>document.getElementById(id);
-function binsF(idx,k,tg,mx){const col=C[k]||[],W=C.w,u=new Map,d=new Map,n=new Map;for(const i of idx){const v=col[i];if(v==null||v>mx)continue;const b=Math.floor(v/B)*B,w=W&&W[i]!=null?W[i]:1;u.set(b,(u.get(b)||0)+w);n.set(b,(n.get(b)||0)+1);if(C.finish[i]<=tg)d.set(b,(d.get(b)||0)+w)}
- return[...u.keys()].sort((a,b)=>a-b).map(b=>({lo:b,n:n.get(b),p:(d.get(b)||0)/u.get(b)}))}
+function binsF(idx,k,tg,mx){const col=C[k]||[],W=C.w,u=new Map,d=new Map,q=new Map;for(const i of idx){const v=col[i];if(v==null||v>mx)continue;const b=Math.floor(v/B)*B,w=W&&W[i]!=null?W[i]:1;u.set(b,(u.get(b)||0)+w);q.set(b,(q.get(b)||0)+w*w);if(C.finish[i]<=tg)d.set(b,(d.get(b)||0)+w)}
+ return[...u.keys()].sort((a,b)=>a-b).map(b=>({lo:b,n:u.get(b)*u.get(b)/q.get(b),p:(d.get(b)||0)/u.get(b)}))}
 // 完走しなかった人も使う版: 打ち切り(相手の完走で試合が終わった)を、カプラン・マイヤー法で補正する
 function binsKM(k,tg,mx){const col=C[k]||[],W=C.w,g=new Map();
  for(let q=0;q<ORD.length;q++){const i=ORD[q];if(!POP[i])continue;const v=col[i];if(v==null||v>mx)continue;const b=Math.floor(v/B)*B;let a=g.get(b);if(!a){a=[];g.set(b,a)}a.push(i)}
- return[...g.keys()].sort((x,y)=>x-y).map(b=>{const a=g.get(b);let n=0,S=1;for(const i of a)n+=W&&W[i]!=null?W[i]:1;
+ return[...g.keys()].sort((x,y)=>x-y).map(b=>{const a=g.get(b);let n=0,s2=0,S=1;for(const i of a){const w=W&&W[i]!=null?W[i]:1;n+=w;s2+=w*w}const ne=n*n/s2;
   for(const i of a){if(OT[i]>tg||n<=0)break;const w=W&&W[i]!=null?W[i]:1;if(OE[i])S*=Math.max(0,1-w/n);n-=w}
-  return{lo:b,n:a.length,p:1-S}})}
+  return{lo:b,n:ne,p:1-S}})}
 function bins(idx,k,tg,mx){return CORR&&ORD?binsKM(k,tg,mx):binsF(idx,k,tg,mx)}
 // 走りごとの「結果の時刻」。完走した人=完走タイム(結果あり) / 打ち切られた人=試合が終わった時刻(結果なし) / 棄権を失敗とする設定のとき、棄権した人=いつまでも完走しない
 function prep(){LASTFF=SET.ffFail;if(!(C.full&&C.mend)){OT=OE=ORD=null;return}OT=new Float64Array(N);OE=new Uint8Array(N);
@@ -257,6 +257,8 @@ function summary(){if(!C)return'(no data)';const n=N,W=C.w,sum=a=>a.reduce((x,v)
  'start: '+cnt(i=>C.start[i],['Buried Treasure','Shipwreck','Village','Ruined Portal','Desert Temple'].map((nm,k)=>[nm,k])),
  'bastion: '+cnt(i=>C.bastion_type[i],['Bridge','Housing','Stables','Treasure'].map((nm,k)=>[nm,k])),
  'split coverage: '+K.map(k=>k+':'+(C[k]?C[k].filter(v=>v!=null).length:0)).join(' '),
+ (()=>{const wv=i=>W&&W[i]!=null?W[i]:1;let tw=0,t2=0,fw=0,ffw=0,rsw=0;const bw={},sw={};for(let i=0;i<n;i++){const w=wv(i);tw+=w;t2+=w*w;if(C.finish[i]!=null)fw+=w;if(C.ff&&C.ff[i]===1)ffw+=w;if(C.rs&&C.rs[i]>0)rsw+=w;const b=bandOf(i);bw[b]=(bw[b]||0)+w;const s=C.start[i];sw[s]=(sw[s]||0)+w}const pc=x=>(100*x/tw).toFixed(1)+'%';
+ return `weighted (population estimate): finished ${pc(fw)} / runs in forfeited matches ${pc(ffw)} / runs with resets ${pc(rsw)} / effective sample size ${Math.round(tw*tw/t2)}\nweighted rank: `+[...RKN.map((nm,k)=>[nm,k]),['Unrated','U']].map(k=>k[0]+':'+pc(bw[k[1]]||0)).join(' ')+'\nweighted start: '+['Buried Treasure','Shipwreck','Village','Ruined Portal','Desert Temple'].map((nm,k)=>nm+':'+pc(sw[k]||0)).join(' ')})(),
  `fastest ${fmt(FAST)} / slider ${fmt(LO)}–30:00 / filters: skill=${$('sk').value} season=${$('se').value} start=${$('ow').value}`].join('\n')}
 function syncSeg(){document.querySelectorAll('.sw').forEach(s=>{const cb=$(s.dataset.for);s.classList.toggle('dis',cb.disabled);s.setAttribute('aria-checked',String(cb.checked));s.querySelector('.sw-lbl').textContent=cb.checked?T('On','オン'):T('Off','オフ')})}
 document.querySelectorAll('.sw').forEach(s=>s.onclick=()=>{const cb=$(s.dataset.for);if(cb.disabled)return;cb.checked=!cb.checked;cb.onchange({target:cb});syncSeg()});
