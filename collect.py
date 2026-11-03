@@ -285,6 +285,23 @@ def build(days):
           "/ バスチオン:", {o: R["bastion_type"].count(i) for i, o in enumerate(BT)},
           "/ 直近の試合: 完走者2人以上", stat["multi_finish"], "・完走者0人", stat["no_finish"], "(うち途中棄権", stat["ff"], ")・全", stat["matches"], "/ 旧形式で捨てた試合", stat["old"])
 
+def probe_reset(lst, tries=15):
+    """リセットのある試合を探し、その走者のイベントを、APIが返した順のまま表示する(時刻の付き方を確かめるため)"""
+    short = lambda ty: ty.split(".")[-1]
+    n = 0
+    for m in lst:
+        if n >= tries: break
+        d = get(f"/matches/{m['id']}"); n += 1
+        ts = d.get("timelines") or []
+        for u in dict.fromkeys(t["uuid"] for t in ts):
+            ev = [t for t in ts if t["uuid"] == u]
+            if any(t["type"] == RESET for t in ev):
+                res = d.get("result") or {}
+                print(f"[probe] リセットのある試合の例(id={d['id']}, 走者={u[:6]}): 結果={res.get('time')} 勝者={(res.get('uuid') or '')[:6]} 完走={[(c['uuid'][:6], c['time']) for c in d.get('completions') or []]}")
+                print("[probe]  イベント(APIの順 / 時刻ms:種類):", " ".join(f"{t['time']}:{short(t['type'])}" for t in ev if t["type"] == RESET or t["type"] in IDX or "death" in t["type"]))
+                return
+    print(f"[probe] リセットのある試合は見つかりませんでした({n}試合を調べた)")
+
 def probe():
     """APIの応答の形を確かめる(2リクエストだけ)。結果はそのまま貼って共有できる(UUIDは先頭6文字だけ)。"""
     sh = lambda u: (u or "")[:6]
@@ -303,6 +320,7 @@ def probe():
         x["seen"][t["type"]] = x["seen"].get(t["type"], 0) + 1
     for u, x in info.items(): x["dup"] = {k: v for k, v in x.pop("seen").items() if v >= 2}
     print("[probe] 詳細: リセット時刻と、同じイベントが2回以上ある種類:", info)
+    probe_reset(lst)
     r = rows(d)
     print("[probe] 詳細: 区間に直した結果(試合前Elo, 試合後Elo, リセット回数, 区間8つ, リセット詳細):", [[sh(x[1])] + x[3:] for x in r])
 
