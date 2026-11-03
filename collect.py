@@ -36,7 +36,7 @@ BT = ["BRIDGE", "HOUSING", "STABLES", "TREASURE"]                               
 #   bg: ビギナー戦  bot: bot由来  w: 重み(=1/抽出確率)  rl: 区間まで進んでからのリセット [[時刻, 進んだ区間の番号, その区間の時刻],...]
 COLS = ["runner_idx", "season", "time", "start", "bastion_type", "finish", "mend", "elo", "elo_pl", "rs",
         "full", "ff", "win", "bg", "bot", "w", "rl", *KEYS]
-NOT_IN_JSON = {"rl"}            # finishers.json には入れない列(ページでは使わない)
+NOT_IN_JSON = set()             # finishers.json に入れない列(今はなし)
 DEFAULT = {"full": 0, "w": 1.0}  # 旧形式の archive で欠けている列の既定値(それ以外は None)
 VER, SVER = 3, 2                 # 記録の形式 / 状態ファイルの形式
 RESET = "projectelo.timeline.reset"
@@ -236,7 +236,7 @@ def build(days):
         else: win = None
         p = m.get("p"); w = round(1 / p, 4) if p else 1.0
         return [rid(runners, uuid, nick, m["date"]), m["season"], m["date"], m["ow"], m.get("bt", -1), fin,
-                m.get("end"), pre, pl, rs, 1, ff, win, m.get("bg", 0), m.get("bot", 0), w, rl, *sp]
+                m.get("end"), pre, pl, rs, 1, ff, win, m.get("bg", 0), m.get("bot", 0), w, rl or None, *sp]
 
     keep, arch, R = [], {}, {c: [] for c in COLS}
     stat = {"matches": 0, "multi_finish": 0, "no_finish": 0, "ff": 0, "old": 0}
