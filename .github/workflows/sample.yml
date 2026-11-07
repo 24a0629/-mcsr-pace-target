@@ -1,0 +1,13 @@
+name: sample
+on: workflow_dispatch
+jobs:
+  sample:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: {python-version: "3.12"}
+      - run: python collect.py sample --n 300
+      - uses: actions/upload-artifact@v4
+        with: {name: sample, path: sample/}
