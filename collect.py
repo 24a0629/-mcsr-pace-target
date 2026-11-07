@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """MCSR Ranked のランク戦のデータを集めて蓄積する(標準ライブラリのみ・管理者権限不要)。
   python collect.py probe                  # APIの応答の形を確かめる(2リクエスト)
+  python collect.py sample [--n 300]       # 分析用に、APIの生の応答を sample/ に保存する(約450リクエスト・10分弱)
   python collect.py fetch [--minutes 25]   # 何度でも再実行OK(続きから再開)
   python collect.py build [--days 14]      # 古い試合を数値だけ(走者は番号)の archive に移し、finishers.json / meta.json を生成
 
@@ -285,6 +286,35 @@ def build(days):
           "/ バスチオン:", {o: R["bastion_type"].count(i) for i, o in enumerate(BT)},
           "/ 直近の試合: 完走者2人以上", stat["multi_finish"], "・完走者0人", stat["no_finish"], "(うち途中棄権", stat["ff"], ")・全", stat["matches"], "/ 旧形式で捨てた試合", stat["old"])
 
+def sample(n_ranked, n_other=30):
+    """分析用に、APIの生の応答をそのまま保存する(sample/ フォルダ)。ランク戦(type=2)を中心に、ほかの種類(1・3・4)も少しだけ。"""
+    out = Path("sample"); out.mkdir(exist_ok=True)
+    vals = lambda k, src: sorted({str(x.get(k)) for x in src})
+    for t, n in [(2, n_ranked), (1, n_other), (3, n_other), (4, n_other)]:
+        lst, cur = [], None
+        for _ in range(10):  # 一覧を最大1000件
+            try: pg = get(f"/matches?type={t}&count=100" + (f"&before={cur}" if cur else ""))
+            except urllib.error.HTTPError as e: print("[sample] type", t, "error", e.code); break
+            if not pg: break
+            lst += pg; cur = min(m["id"] for m in pg)
+        cand = [m for m in lst if not m.get("decayed")]
+        key = lambda m: h01(m["id"])
+        if t == 2:  # 途中棄権と、そうでない試合を半々で
+            ff = sorted((m for m in cand if m.get("forfeited")), key=key)[: n // 2]
+            ok = sorted((m for m in cand if not m.get("forfeited")), key=key)[: n - len(ff)]
+            pick = ff + ok
+        else:
+            pick = sorted(cand, key=key)[:n]
+        det = []
+        for m in pick:
+            try: det.append(get(f"/matches/{m['id']}"))
+            except urllib.error.HTTPError as e: print("skip", m["id"], e.code)
+        (out / f"list_type{t}.json").write_text(json.dumps(lst, ensure_ascii=False), encoding="utf-8")
+        (out / f"matches_type{t}.json").write_text(json.dumps(det, ensure_ascii=False), encoding="utf-8")
+        print(f"[sample] type={t}: 一覧 {len(lst)} 件 / 詳細 {len(det)} 件 / 途中棄権 {sum(1 for m in lst if m.get('forfeited'))} / "
+              f"gameMode={vals('gameMode', lst)} category={vals('category', lst)} tag={vals('tag', lst)[:8]} "
+              f"seedType={vals('seedType', lst)} botSource={vals('botSource', lst)[:5]} beginner={vals('beginner', lst)}")
+
 def probe_reset(lst, tries=15):
     """リセットのある試合を探し、その走者のイベントを、APIが返した順のまま表示する(時刻の付き方を確かめるため)"""
     short = lambda ty: ty.split(".")[-1]
@@ -326,8 +356,9 @@ def probe():
 
 if __name__ == "__main__":
     ap = argparse.ArgumentParser()
-    ap.add_argument("cmd", choices=["fetch", "build", "probe"])
+    ap.add_argument("cmd", choices=["fetch", "build", "probe", "sample"])
+    ap.add_argument("--n", type=int, default=300)
     ap.add_argument("--minutes", type=float, default=25)
     ap.add_argument("--days", type=int, default=14)
     a = ap.parse_args()
-    {"fetch": lambda: fetch(a.minutes), "build": lambda: build(a.days), "probe": probe}[a.cmd]()
+    {"fetch": lambda: fetch(a.minutes), "build": lambda: build(a.days), "probe": probe, "sample": lambda: sample(a.n)}[a.cmd]()
