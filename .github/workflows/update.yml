@@ -20,7 +20,7 @@ jobs:
         with: {python-version: "3.12"}
       - run: python collect.py probe
         continue-on-error: true
-      - run: python collect.py fetch --minutes 40 && python collect.py build --days 14
+      - run: python collect.py fetch --minutes 40 && python collect.py build --days 7
       - name: save data branch (1コミットに上書き=履歴が増えない)
         env: {GH_TOKEN: "${{ secrets.GITHUB_TOKEN }}"}
         run: |
