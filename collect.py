@@ -3,7 +3,7 @@
   python collect.py probe                  # APIの応答の形を確かめる(2リクエスト)
   python collect.py sample [--n 300]       # 分析用に、APIの生の応答を sample/ に保存する(約450リクエスト・10分弱)
   python collect.py fetch [--minutes 25]   # 何度でも再実行OK(続きから再開)
-  python collect.py build [--days 14]      # 古い試合を数値だけ(走者は番号)の archive に移し、finishers.json / meta.json を生成
+  python collect.py build [--days 7]      # 古い試合を数値だけ(走者は番号)の archive に移し、finishers.json / meta.json を生成
 
 2段階の抽出:
   ①一覧(1リクエストで100試合)を新しい順にたどり、試合を「層」に分ける。
@@ -216,6 +216,15 @@ def record():
     try: return min(e["time"] for e in get("/record-leaderboard"))
     except Exception as e: print("最速タイムの取得に失敗:", e); return None
 
+ARCH_MAX = 40_000_000  # archive の1ファイルの上限(GitHubは1ファイル100MBまで)。超えたら s12_1.jsonl のように分ける
+
+def arch_path(season):
+    k = 0
+    while True:
+        p = A / (f"s{season}.jsonl" if k == 0 else f"s{season}_{k}.jsonl")
+        if not p.exists() or p.stat().st_size < ARCH_MAX: return p
+        k += 1
+
 def rid(runners, uuid, nick, date):
     r = runners.get(uuid)
     if r is None: r = runners[uuid] = [len(runners), nick, date]
@@ -258,7 +267,7 @@ def build(days):
                 for c, v in zip(COLS, vals(m, row)): g["runs"][c].append(v)
         for sn, g in arch.items():  # 追記のみ(数値だけ・ID は差分符号化)
             ids = sorted(g["ids"]); delta = [ids[0]] + [b - a for a, b in zip(ids, ids[1:])]
-            with (A / f"s{sn}.jsonl").open("a", encoding="utf-8") as f:
+            with arch_path(sn).open("a", encoding="utf-8") as f:
                 f.write(json.dumps({"ids": delta, "runs": g["runs"]}) + "\n")
         RECENT.write_text("".join(keep), encoding="utf-8")
     for p in sorted(A.glob("s*.jsonl")):
@@ -277,6 +286,10 @@ def build(days):
     fin = sum(v is not None for v in R["finish"])
     (D / "meta.json").write_text(json.dumps({"schema_version": 7, "runs": len(R["finish"]), "finishers": fin,
         "record_ms": record(), "snapshot_date": datetime.date.today().isoformat()}))
+    sizes = {f.name: f.stat().st_size for f in [RECENT, D / "finishers.json", *A.glob("s*.jsonl")] if f.exists()}
+    print("ファイルサイズ(MB。5MB以上のみ):", {n: round(v / 1e6, 1) for n, v in sizes.items() if v > 5e6},
+          "※ GitHubは1ファイル100MBまで(finishers.json は公開用に毎回作るので対象外)")
+    if any(v > 80e6 for n, v in sizes.items() if n != "finishers.json"): print("!! 80MBを超えたファイルがあります。100MBを超えると保存に失敗します。")
     bys = {}
     for sn, w in zip(R["season"], R["w"]): bys[sn] = bys.get(sn, 0) + 1
     print(f"{len(R['finish'])} 走り(うち完走 {fin}) / 走者 {len(runners)} 人 / シーズン別:", dict(sorted(bys.items())),
@@ -359,6 +372,6 @@ if __name__ == "__main__":
     ap.add_argument("cmd", choices=["fetch", "build", "probe", "sample"])
     ap.add_argument("--n", type=int, default=300)
     ap.add_argument("--minutes", type=float, default=25)
-    ap.add_argument("--days", type=int, default=14)
+    ap.add_argument("--days", type=int, default=7)
     a = ap.parse_args()
     {"fetch": lambda: fetch(a.minutes), "build": lambda: build(a.days), "probe": probe, "sample": lambda: sample(a.n)}[a.cmd]()
